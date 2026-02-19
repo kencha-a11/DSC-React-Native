@@ -1,24 +1,28 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+// app/_layout.tsx
+console.info("[ROOTLAYOUT] Rendering RootLayout with Providers and AuthGuard");
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AuthProvider } from "@/context/AuthContext";
+import { AuthGuard } from "@/context/AuthGuard";
+import { CartProvider } from "@/context/CartContext";
+import { ProductProvider } from "@/context/ProductContext";
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { Slot } from "expo-router";
+import "../global.css";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <AuthProvider>
+      <ProductProvider>
+        <CartProvider>
+          <AuthGuard />
+          <Slot />
+        </CartProvider>
+      </ProductProvider>
+    </AuthProvider>
   );
 }
+
+/* ProductProvider is nested inside AuthProvider so that 
+  Axios calls made by the ProductContext can access the 
+  Auth token from your SecureStore/Auth state.
+*/
