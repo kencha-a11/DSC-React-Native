@@ -14,7 +14,7 @@
       "android": {
         "image": "latest",
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
+        "gradleCommand": ":app:assembleDebug"
       },
       "env": {
         "GRADLE_OPTS": "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false"

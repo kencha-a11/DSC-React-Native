@@ -7,7 +7,11 @@
         "./*"
       ]
     },
-    "jsx": "react-native"
+    "jsx": "react-native",
+    "moduleResolution": "bundler", // ✅ Pinakamoderno para sa Expo
+    "skipLibCheck": true,  // This helps avoid similar errors
+    "types": ["jest", "node"],
+    "esModuleInterop": true,
   },
   "include": [
     "**/*.ts",
@@ -15,5 +19,6 @@
     "nativewind-env.d.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ]
+  ],
+  
 }
