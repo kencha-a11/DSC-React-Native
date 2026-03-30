@@ -1,20 +1,147 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { Tabs } from "expo-router";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { Tabs, router } from "expo-router";
+import { Platform, View, Text, TouchableWithoutFeedback, StyleSheet } from "react-native";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { usePermissions } from "@/context/PermissionContext";
+
+type FontAwesome5IconName = React.ComponentProps<typeof FontAwesome5>["name"];
+type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
+
+interface TabItem {
+  name: string;
+  title: string;
+  icon: FontAwesome5IconName | MaterialIconName;
+  library: "FontAwesome5" | "MaterialIcons";
+}
+
+// Helper component to render the correct icon
+const TabIcon = ({ library, name, color }: { library: TabItem["library"]; name: TabItem["icon"]; color: string }) => {
+  if (library === "FontAwesome5") {
+    return <FontAwesome5 name={name as FontAwesome5IconName} size={22} color={color} />;
+  }
+  return <MaterialIcons name={name as MaterialIconName} size={24} color={color} />;
+};
+
+function CustomTabBar({ state, navigation }: any) {
+  const { hasPermission } = usePermissions();
+
+  const hasInventoryAccess =
+    hasPermission("view_inventory") ||
+    hasPermission("add_item") ||
+    hasPermission("edit_items") ||
+    hasPermission("restock_items") ||
+    hasPermission("deduct_items") ||
+    hasPermission("remove_items");
+
+  // Define visible tabs based on permissions
+  const tabs: TabItem[] = [
+    { name: "index", title: "Home", icon: "home", library: "FontAwesome5" },
+    ...(hasInventoryAccess
+      ? [
+        {
+          name: "inventory",
+          title: "Inventory",
+          icon: "inventory" as MaterialIconName,
+          library: "MaterialIcons" as const,
+        },
+      ]
+      : []),
+    {
+      name: "profile",
+      title: "Profile",
+      icon: "account-circle" as MaterialIconName,
+      library: "MaterialIcons" as const,
+    },
+    // {
+    //   name: "test",
+    //   title: "test",
+    //   icon: "test-circle" as MaterialIconName,
+    //   library: "MaterialIcons" as const,
+    // },
+  ];
+
+  const handleTabPress = (tabName: string, isFocused: boolean) => {
+    if (isFocused) return;
+
+    // Emit event to allow any listeners (optional)
+    const event = navigation.emit({
+      type: "tabPress",
+      target: tabName,
+      canPreventDefault: true,
+    });
+
+    if (!event.defaultPrevented) {
+      // Navigate using Expo Router – explicit literals to satisfy TypeScript
+      if (tabName === "index") {
+        router.push("/(cashier)/(tabs)");
+      } else if (tabName === "inventory") {
+        router.push("/(cashier)/(tabs)/inventory");
+      } else if (tabName === "profile") {
+        router.push("/(cashier)/(tabs)/profile");
+      }
+      // else if (tabName === "test") {
+      //   router.push("/(cashier)/(tabs)/test")
+      // }
+    }
+  };
+
+  return (
+    <View style={styles.tabBar}>
+      {tabs.map((tab) => {
+        // ✅ Fix: Determine focus by comparing route names, not indices
+        const isFocused = state.routes[state.index].name === tab.name;
+        const color = isFocused ? "#ED277C" : "#999";
+
+        return (
+          <TouchableWithoutFeedback
+            key={tab.name}
+            onPress={() => handleTabPress(tab.name, isFocused)}
+          >
+            <View style={styles.tabItem}>
+              <TabIcon library={tab.library} name={tab.icon} color={color} />
+              <Text style={[styles.tabText, { color }]}>{tab.title}</Text>
+            </View>
+          </TouchableWithoutFeedback>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 20 : 40,
+  },
+  tabItem: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 2,
+    paddingVertical: 8,
+  },
+  tabText: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+});
 
 export default function TabLayout() {
   return (
-    // <Tabs>
-    //   {/* <Tabs.Screen
-    //     // name="index"
-    //     options={{
-    //     //   title: "Home",
-    //     //   tabBarIcon: ({ color }) => (
-    //     //     <Ionicons size={28} name="home" color={color} />
-    //     //   ),
-    //     //   tabBarIcon: false,
-    //     }}
-    //   /> */}
-    // </Tabs>
-    <></>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        animation: "none",
+      }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+    >
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="inventory" />
+      <Tabs.Screen name="profile" />
+    </Tabs>
   );
 }
