@@ -1,288 +1,219 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-} from "react";
-import { CreateSalePayload, createSale } from "@/services/saleServices";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// contexts/CartContext.tsx
+import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo, useEffect } from "react";
+import { CreateSalePayload, saleService } from "@/services/saleService";
 import { useProducts } from "./ProductContext";
+import { useAuth } from "./AuthContext";
+import { Alert, Platform, ToastAndroid } from "react-native";
 
-// Define input type for adding items (without quantity)
 interface AddToCartInput {
   id: number;
   name: string;
   price: number;
+  image?: string | null;
 }
 
-// Cart item type (includes quantity)
-interface CartItem {
+export interface CartItem {
   id: number;
   name: string;
   price: number;
   quantity: number;
+  image?: string | null;
 }
 
 interface CartContextType {
   cartItems: CartItem[];
-  addItem: (product: AddToCartInput, quantity?: number) => void; // Changed to AddToCartInput
+  addItem: (product: AddToCartInput, quantity?: number) => void;
   removeItem: (id: number) => void;
   incrementQuantity: (id: number) => void;
   decrementQuantity: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
-  confirmPurchase: () => Promise<void>;
+  confirmPurchase: () => Promise<boolean>;
   total: number;
+  formattedTotal: string;
   loading: boolean;
   hasItems: boolean;
   itemCount: number;
 }
 
-const CACHE_KEY = "cart_cache";
-const CACHE_TIMESTAMP_KEY = "cart_cache_timestamp";
-const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
-
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// 2. The Provider (The "Engine" that manages the data)
+const showToast = (message: string, type: "error" | "success" | "warning" = "error") => {
+  if (Platform.OS === "android") {
+    ToastAndroid.show(message, ToastAndroid.SHORT);
+  } else {
+    Alert.alert(
+      type === "error" ? "Error" : type === "success" ? "Success" : "Warning",
+      message
+    );
+  }
+};
+
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const { fetchProducts, products } = useProducts(); // Get both in one call
 
-  // 💾 Load cached cart on mount
-  useEffect(() => {
-    loadCache();
-  }, []);
+  const { isAuthenticated } = useAuth();
+  const { products, refreshProducts } = useProducts();
 
-  // 💾 Save to cache whenever cartItems changes
-  useEffect(() => {
-    if (cartItems.length > 0) {
-      saveCache(cartItems);
-    } else {
-      clearCacheStorage();
-    }
-  }, [cartItems]);
-
-  const loadCache = async () => {
-    try {
-      const [cached, timestamp] = await Promise.all([
-        AsyncStorage.getItem(CACHE_KEY),
-        AsyncStorage.getItem(CACHE_TIMESTAMP_KEY),
-      ]);
-
-      if (cached && timestamp) {
-        const age = Date.now() - parseInt(timestamp);
-        if (age < CACHE_EXPIRY_MS) {
-          setCartItems(JSON.parse(cached));
-          console.log("[CartContext] ✅ Loaded cart from cache");
-          return;
-        } else {
-          console.log("[CartContext] ⏰ Cart cache expired, starting fresh");
-          await clearCacheStorage();
-        }
+  const productMap = useMemo(() => {
+    const map = new Map<number, number>();
+    products.forEach(p => {
+      map.set(p.id, p.stock_quantity);
+      if (p.id === 77) {
       }
-    } catch (e) {
-      console.error("[CartContext] ❌ Cache load error:", e);
+    });
+    return map;
+  }, [products]);
+
+  const getStock = useCallback((id: number) => {
+    const stock = productMap.get(id) ?? 0;
+    if (id === 77) {
     }
-  };
+    return stock;
+  }, [productMap]);
 
-  const saveCache = async (data: CartItem[]) => {
-    try {
-      await Promise.all([
-        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data)),
-        AsyncStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString()),
-      ]);
-      console.log("[CartContext] 💾 Cart saved to cache");
-    } catch (e) {
-      console.error("[CartContext] ❌ Cache save error:", e);
+  const addItem = useCallback((product: AddToCartInput, quantity = 1) => {
+    if (!isAuthenticated) {
+      showToast("Please log in to add items to cart");
+      return;
     }
-  };
-
-  const clearCacheStorage = async () => {
-    try {
-      await Promise.all([
-        AsyncStorage.removeItem(CACHE_KEY),
-        AsyncStorage.removeItem(CACHE_TIMESTAMP_KEY),
-      ]);
-      console.log("[CartContext] 🗑️ Cache cleared");
-    } catch (e) {
-      console.error("[CartContext] ❌ Cache clear error:", e);
+    const stock = getStock(product.id);
+    if (quantity > stock) {
+      showToast(`Only ${stock} available.`);
+      return;
     }
-  };
-
-  const clearCart = async () => {
-    setCartItems([]); // reset state
-    await clearCacheStorage(); // clear storage
-  };
-
-  // Helper function to check stock - using only stock_quantity
-  const checkStockAvailability = (
-    productId: number,
-    requestedQuantity: number,
-  ): { available: boolean; stock: number } => {
-    const actualProduct = products.find((p) => p.id === productId);
-    // Only use stock_quantity, remove the fallback to 'stock'
-    const availableStock = actualProduct?.stock_quantity ?? 0;
-
-    return {
-      available: requestedQuantity <= availableStock,
-      stock: availableStock,
-    };
-  };
-
-  const addItem = (product: AddToCartInput, quantity: number = 1) => {
-    setCartItems((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
-      const { available, stock } = checkStockAvailability(product.id, quantity);
-
-      if (!available) {
-        alert(`Not enough stock. Only ${stock} available.`);
-        return prev;
-      }
-
+    setCartItems(prev => {
+      const existing = prev.find(i => i.id === product.id);
       if (existing) {
-        const newQuantity = existing.quantity + quantity;
-        // Check total quantity including existing cart items
-        const { available: totalAvailable, stock: totalStock } =
-          checkStockAvailability(product.id, newQuantity);
-
-        if (!totalAvailable) {
-          alert(
-            `Cannot add ${quantity} more. Only ${totalStock - existing.quantity} additional available.`,
-          );
+        const newQty = existing.quantity + quantity;
+        if (newQty > stock) {
+          showToast(`Cannot add ${quantity} more. Only ${stock - existing.quantity} additional available.`);
           return prev;
         }
-
-        return prev.map((item) =>
-          item.id === product.id ? { ...item, quantity: newQuantity } : item,
-        );
+        return prev.map(i => i.id === product.id ? { ...i, quantity: newQty } : i);
       }
-
-      // Create a CartItem from AddToCartInput and quantity
-      const newItem: CartItem = {
-        ...product,
-        quantity,
-      };
-      return [...prev, newItem];
+      return [...prev, { ...product, quantity, image: product.image ?? null }];
     });
-  };
+  }, [isAuthenticated, getStock]);
 
-  const removeItem = (id: number) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
-  };
+  const removeItem = useCallback((id: number) => {
+    setCartItems(prev => {
+      const newCart = prev.filter(i => i.id !== id);
+      return newCart;
+    });
+  }, []);
 
-  // Increment quantity by 1 with stock check
-  const incrementQuantity = (id: number) => {
-    setCartItems((prev) => {
-      const item = prev.find((item) => item.id === id);
-      if (!item) return prev;
-
-      const { available, stock } = checkStockAvailability(
-        id,
-        item.quantity + 1,
-      );
-
-      if (!available) {
-        alert(`Cannot add more. Only ${stock} total available.`);
+  const incrementQuantity = useCallback((id: number) => {
+    setCartItems(prev => {
+      const item = prev.find(i => i.id === id);
+      if (!item) {
         return prev;
       }
-
-      return prev.map((item) =>
-        item.id === id ? { ...item, quantity: item.quantity + 1 } : item,
-      );
+      const newQty = item.quantity + 1;
+      if (newQty > getStock(id)) {
+        showToast(`Cannot add more. Only ${getStock(id)} total available.`);
+        return prev;
+      }
+      return prev.map(i => i.id === id ? { ...i, quantity: newQty } : i);
     });
-  };
+  }, [getStock]);
 
-  // Decrement quantity by 1, remove if reaches 0
-  const decrementQuantity = (id: number) => {
-    setCartItems((prev) =>
-      prev
-        .map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity - 1 } : item,
-        )
-        .filter((item) => item.quantity > 0),
-    );
-  };
+  const decrementQuantity = useCallback((id: number) => {
+    setCartItems(prev => {
+      const newCart = prev
+        .map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i)
+        .filter(i => i.quantity > 0);
+      return newCart;
+    });
+  }, []);
 
-  // Set exact quantity (useful for manual input)
-  const updateQuantity = (id: number, quantity: number) => {
+  const updateQuantity = useCallback((id: number, quantity: number) => {
     if (quantity <= 0) {
       removeItem(id);
       return;
     }
-
-    setCartItems((prev) => {
-      const { available, stock } = checkStockAvailability(id, quantity);
-
-      if (!available) {
-        alert(`Cannot set quantity to ${quantity}. Only ${stock} available.`);
-        return prev;
-      }
-
-      return prev.map((item) =>
-        item.id === id ? { ...item, quantity } : item,
-      );
-    });
-  };
-
-  const total = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
-
-  const confirmPurchase = async () => {
-    if (cartItems.length === 0) {
-      alert("Cart is empty");
+    if (quantity > getStock(id)) {
+      showToast(`Cannot set quantity to ${quantity}. Only ${getStock(id)} available.`);
       return;
     }
+    setCartItems(prev => prev.map(i => i.id === id ? { ...i, quantity } : i));
+  }, [getStock, removeItem]);
 
-    // Double-check stock before confirming purchase
+  const clearCart = useCallback(() => {
+    setCartItems([]);
+  }, []);
+
+  const confirmPurchase = useCallback(async () => {
+
+    if (!isAuthenticated) {
+      showToast("Please log in to complete purchase");
+      return false;
+    }
+    if (cartItems.length === 0) {
+      showToast("Cart is empty");
+      return false;
+    }
+
+    // Final stock validation
     for (const item of cartItems) {
-      const { available, stock } = checkStockAvailability(
-        item.id,
-        item.quantity,
-      );
-      if (!available) {
-        alert(
-          `Sorry, "${item.name}" stock changed. Only ${stock} available. Please adjust your cart.`,
-        );
-        return;
+      const stock = getStock(item.id);
+      if (item.quantity > stock) {
+        showToast(`"${item.name}" only has ${stock} in stock.`);
+        return false;
       }
     }
 
     setLoading(true);
     try {
+      const total = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
       const payload: CreateSalePayload = {
-        items: cartItems.map((item) => ({
-          product_id: item.id,
-          quantity: item.quantity,
-        })),
+        items: cartItems.map(i => ({ product_id: i.id, quantity: i.quantity })),
         total_amount: total,
         device_datetime: new Date().toISOString(),
       };
 
-      // 1. Send data to backend (PHP store function)
-      await createSale(payload);
+      const startTime = Date.now();
+      const response = await saleService.createSale(payload, { allowOffline: true, timeout: 15000 });
+      const saleDuration = Date.now() - startTime;
 
-      // 2. Refresh ProductContext stocks (to update "30 left" in UI)
-      await fetchProducts();
+      if (response.sale_id === -1) {
+        showToast("Sale saved offline. Will sync when online.", "warning");
+        return false;
+      }
 
-      // 3. Success! Clear the cart (this will also clear cache)
-      clearCart();
-      alert("Purchase Successful!");
+      // 🔥 Wait for database to commit the stock change
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const refreshStart = Date.now();
+      await refreshProducts();
+      const refreshDuration = Date.now() - refreshStart;
+
+      // Log the stock of product 61 after refresh (to verify it changed)
+      const product61 = products.find(p => p.id === 61);
+      if (product61) {
+      } else {
+      }
+
+      setCartItems([]);
+
+      return true;
     } catch (error: any) {
-      // Error handling for issues like "Not enough stock" from backend
-      alert(error.message || "Something went wrong");
-      console.error("[CartContext] ❌ Purchase failed:", error);
+      showToast(error.message || "Something went wrong");
+      return false;
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, cartItems, getStock, refreshProducts, products]);
 
+  // Log when cart changes
+  useEffect(() => {
+  }, [cartItems]);
+
+  const total = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const formattedTotal = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(total);
   const hasItems = cartItems.length > 0;
-  const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const itemCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
   return (
     <CartContext.Provider
@@ -296,6 +227,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         clearCart,
         confirmPurchase,
         total,
+        formattedTotal,
         loading,
         hasItems,
         itemCount,
@@ -306,7 +238,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// 3. The Hook (How you use it in other files)
 export const useCart = () => {
   const context = useContext(CartContext);
   if (!context) throw new Error("useCart must be used within a CartProvider");
