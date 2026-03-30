@@ -1,18 +1,18 @@
-// src/screens/PasswordLoginScreen.tsx
-import React from "react";
+import logo from "@/assets/logo/dsc-logo.png";
+import { usePasswordLogin } from "@/hooks/usePasswordLogin";
+import React, { useRef } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  StyleSheet,
+  View,
 } from "react-native";
-import { usePasswordLogin } from "@/hooks/usePasswordLogin";
-import logo from "@/assets/logo/dsc-logo.png";
 
 export default function PasswordLoginScreen() {
   const {
@@ -25,82 +25,92 @@ export default function PasswordLoginScreen() {
     error,
   } = usePasswordLogin();
 
+  const inputRef = useRef<TextInput>(null);
+
+  const handleForgotPassword = () => {
+    console.log("Forgot password pressed");
+    // Navigate to forgot password screen
+  };
+
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <View style={styles.container}>
-        {/* LOGO */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={logo}
-            resizeMode="contain"
-            className="w-auto"
-            style={{ aspectRatio: 1 }}
-          />
-        </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          {/* Header with Logo */}
+          <View style={styles.header}>
+            <Image source={logo} style={styles.logo} resizeMode="contain" />
+          </View>
 
-        {/* FORM */}
-        <View style={styles.formContainer}>
-          {/* INPUT */}
-          <View style={styles.inputContainer}>
-            <Text className="text-lg mx-2 mb-2 text-left">
-              Enter your password
-            </Text>
-
+          {/* Middle Wrapper - Password Input */}
+          <View style={styles.middleWrapper}>
+            <Text style={styles.enterPasswordText}>Enter your Password</Text>
             <TextInput
+              ref={inputRef}
+              style={styles.passwordInput}
+              secureTextEntry={true}
+              placeholder="Insert"
+              placeholderTextColor="#999"
+              textAlign="center"
               value={password}
               onChangeText={setPassword}
-              placeholder="Enter Password"
-              placeholderTextColor="#999"
-              secureTextEntry
-              className="w-full h-12 border border-gray-300 rounded-lg px-4 text-lg bg-white mb-4"
               editable={!loading}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={submitOnEnter}
+              cursorColor="transparent" // removes cursor on newer RN
+              // selectionColor="transparent" // for older versions
             />
 
-            <Text className="text-lg text-pink-500 text-center mb-2">
-              Forgot Password?
-            </Text>
+            {/* Forgot Password Link */}
+            <TouchableOpacity
+              style={styles.forgotPasswordButton}
+              onPress={handleForgotPassword}
+              disabled={loading}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
 
-            {error && (
-              <Text className="text-red-500 text-base text-center mt-2">
-                {error}
-              </Text>
-            )}
+            {/* Error Message */}
+            {error && <Text style={styles.errorText}>{error}</Text>}
           </View>
 
-          {/* SUBMIT */}
-          <View style={styles.submitContainer}>
+          {/* Bottom Wrapper - Login Button & Back to PIN */}
+          <View style={styles.bottomWrapper}>
             {/* Login Button */}
             <TouchableOpacity
-              className={`py-3 rounded-lg items-center ${
-                loading || !password ? "bg-gray-400" : "bg-pink-400"
-              }`}
+              style={[
+                styles.loginButton,
+                (loading || !password) && styles.loginButtonDisabled,
+              ]}
               onPress={submitPassword}
               disabled={loading || !password}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text className="text-white text-xl font-bold">Login</Text>
+                <Text style={styles.loginButtonText}>Login</Text>
               )}
             </TouchableOpacity>
 
-            {/* Back Button */}
+            {/* Back to PIN Button */}
             <TouchableOpacity
-              className="py-3 items-center mt-4"
+              style={styles.backButton}
               onPress={goBack}
               disabled={loading}
             >
-              <Text className="text-pink-400 text-lg">← Back to PIN</Text>
+              <Text style={styles.backButtonText}>← Back to PIN</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -110,24 +120,87 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
-  logoContainer: {
-    flex: 3,
+  scrollContent: {
+    flexGrow: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
+    justifyContent: "space-between", // pushes bottom wrapper down when keyboard hidden
+  },
+  header: {
+    alignItems: "center",
+  },
+  logo: {
+    width: 220,
+    height: 220,
+  },
+  middleWrapper: {
+    flex: 1,
+    justifyContent: "flex-start",
+    paddingTop: 30,
+    gap: 20,
+  },
+  enterPasswordText: {
+    fontSize: 18,
+    color: "#666",
+    textAlign: "center",
+  },
+  passwordInput: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: "#E6E6E6",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    fontSize: 18,
+    backgroundColor: "#fff",
+    color: "#000",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  forgotPasswordButton: {
+    alignItems: "center",
+    marginTop: 5,
+  },
+  forgotPasswordText: {
+    fontSize: 16,
+    color: "#ED277C",
+  },
+  bottomWrapper: {
+    gap: 15,
+    marginBottom: 40,
+  },
+  loginButton: {
+    height: 55,
+    backgroundColor: "#ED277C",
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 40,
   },
-  formContainer: {
-    flex: 4,
-    justifyContent: "space-between",
-    marginBottom: 40,
-    marginHorizontal: 16,
-    paddingHorizontal: 16,
+  loginButtonDisabled: {
+    backgroundColor: "#E6E6E6",
   },
-  inputContainer: {
-    flex: 1.5,
+  loginButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
   },
-  submitContainer: {
-    flex: 1,
-  }
+  backButton: {
+    height: 45,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: "#ED277C",
+    fontWeight: "500",
+  },
+  errorText: {
+    fontSize: 14,
+    color: "#FF3B30",
+    textAlign: "center",
+    marginTop: 5,
+  },
 });
-
