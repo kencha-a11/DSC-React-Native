@@ -1,13 +1,11 @@
-import { View, Text, TouchableOpacity, DimensionValue } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import { useIsFocused, useNavigationBuilder } from "@react-navigation/native";
 import { isInsideRect, scanZone } from "@/utils/barcodeScanZone";
-import { useState, useEffect } from "react";
+import { useIsFocused } from "@react-navigation/native";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { DimensionValue, Text, TouchableOpacity, View } from "react-native";
 
-import Svg, { Rect, Defs, Mask } from "react-native-svg";
-
-import ProductTestDataBarcode from "../test/ProductTestDataBarcode";
+import Svg, { Defs, Mask, Rect } from "react-native-svg";
 
 // defined props type
 interface BarcodeLayoutProps {
@@ -23,10 +21,10 @@ interface ButtonProps {
 const BarcodeLayout = ({
   onScanned, // functional component
 }: BarcodeLayoutProps) => {
-  const [permission, requestPermission] = useCameraPermissions() // permission control
-  const [enabled, setEnabled] = useState(true)
-  const [scanning, setScanning] = useState(false)
-  const isFocused = useIsFocused() // screen visibility camera status
+  const [permission, requestPermission] = useCameraPermissions(); // permission control
+  const [enabled, setEnabled] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const isFocused = useIsFocused(); // screen visibility camera status
 
   useEffect(() => {
     // consistent asking permissions
@@ -120,11 +118,14 @@ const BarcodeLayout = ({
     if (isInsideRect(bounds, scanZone)) {
       console.log("✅ Scanned inside rectangle:", data);
       setEnabled(false);
-      setScanning(true)
+      setScanning(true);
       if (onScanned) {
         onScanned(data);
       }
-      setTimeout(() => {setEnabled(true);setScanning(false)}, 1000);
+      setTimeout(() => {
+        setEnabled(true);
+        setScanning(false);
+      }, 1000);
     } else {
       console.log("Ignored scan outside rectangle");
     }
