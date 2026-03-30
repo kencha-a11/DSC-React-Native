@@ -1,5 +1,4 @@
 // src/components/AuthGuard.tsx
-console.info("[AUTHGUARD] Rendering AuthGuard component");
 
 import { useEffect } from "react";
 import { router, useSegments } from "expo-router";
@@ -7,82 +6,118 @@ import { useAuth } from "@/context/AuthContext";
 
 type UserRole = "cashier" | "manager" | "superadmin";
 
-export function AuthGuard() {
+const ROLE_ROUTES: Record<UserRole, string> = {
+  cashier: "/(cashier)",
+  manager: "/(manager)",
+  superadmin: "/(superadmin)",
+};
+
+const GROUP_ALLOWED_ROLES: Record<string, UserRole[]> = {
+  "(cashier)": ["cashier", "manager", "superadmin"],
+  "(manager)": ["manager", "superadmin"],
+  "(superadmin)": ["superadmin"],
+};
+
+/**
+ * Auth screens that are accessible WITHOUT a logged-in user.
+ * Add any future public auth screens here.
+ */
+const PUBLIC_AUTH_SCREENS = new Set([
+  "pincode-login-screen",
+  "password-login-screen",
+]);
+
+interface AuthGuardProps {
+  children?: React.ReactNode;
+}
+
+export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading } = useAuth();
   const segments = useSegments();
 
   useEffect(() => {
     if (loading) return;
 
-    const currentGroup = segments[0];
+    // console.log("🛡️ [AuthGuard] ========== CHECKING ==========");
+    // console.log("🛡️ [AuthGuard] segments:", segments);
+    // console.log(
+    //   "🛡️ [AuthGuard] user:",
+    //   user ? `Logged in as ${user.role}` : "Not logged in",
+    // );
+    // console.log("🛡️ [AuthGuard] loading:", loading);
+
+    const currentGroup = segments[0] as string | undefined;
+    const currentScreen = segments[1] as string | undefined;
     const inAuthGroup = currentGroup === "(auth)";
 
-    // -------------------------------
-    // 1️⃣ Not authenticated → PIN login
-    // -------------------------------
+    // console.log("🛡️ [AuthGuard] currentGroup:", currentGroup);
+    // console.log("🛡️ [AuthGuard] currentScreen:", currentScreen);
+    // console.log("🛡️ [AuthGuard] inAuthGroup:", inAuthGroup);
+
+    // ─────────────────────────────────────────────────────────────
+    // 1. Not authenticated
+    // ─────────────────────────────────────────────────────────────
     if (!user) {
-      if (!inAuthGroup) {
-        console.log("[AUTHGUARD] No user, redirecting to PIN login");
-        // Use the actual file path without parentheses if the error persists,
-        // but typically standardizing on the exported Href type is best.
-        router.replace("/(auth)/pincode-login-screen" as any);
+      // console.log("🛡️ [AuthGuard] User not authenticated");
+
+      // Check if we're on a public auth screen
+      if (inAuthGroup && currentScreen) {
+        // console.log("🛡️ [AuthGuard] Current screen:", currentScreen);
+        // console.log(
+        //   "🛡️ [AuthGuard] Is public auth screen?",
+        //   PUBLIC_AUTH_SCREENS.has(currentScreen),
+        // );
+
+        if (PUBLIC_AUTH_SCREENS.has(currentScreen)) {
+          // console.log(
+          //   "🛡️ [AuthGuard] ✅ On public auth screen, allowing access",
+          // );
+          return; // Allow access to public auth screens
+        }
       }
+
+      // Not on a public auth screen, redirect to PIN login
+      // console.log(
+      //   "🛡️ [AuthGuard] ⚠️ Not on public auth screen, redirecting to PIN login",
+      // );
+      router.replace("/(auth)/pincode-login-screen" as any);
       return;
     }
 
-    const role = (user.role || "").toLowerCase() as UserRole;
+    const role = (user.role ?? "").toLowerCase() as UserRole;
+    // console.log("🛡️ [AuthGuard] User role:", role);
 
-    // -------------------------------
-    // 2️⃣ Authenticated → Redirect away from (auth)
-    // -------------------------------
+    // ─────────────────────────────────────────────────────────────
+    // 2. Authenticated but still on an auth screen → role home
+    // ─────────────────────────────────────────────────────────────
     if (inAuthGroup) {
-      // Best Practice: Always point to a specific screen (like /index)
-      // rather than just the group name folder.
-      const roleRoutes: Record<UserRole, string> = {
-        cashier: "/(cashier)",
-        manager: "/(manager)",
-        superadmin: "/(superadmin)",
-      };
-
-      const destination = roleRoutes[role];
-
-      if (destination) {
-        console.log(`[AUTHGUARD] Redirecting ${role} to ${destination}`);
-        router.replace(destination as any);
-      } else {
-        console.warn(`[AUTHGUARD] Unknown role "${role}"`);
-        router.replace("/(auth)/pincode-login-screen" as any);
-      }
+      // console.log(
+      //   "🛡️ [AuthGuard] Authenticated but on auth screen, redirecting to role home",
+      // );
+      const destination = ROLE_ROUTES[role] ?? "/(auth)/pincode-login-screen";
+      // console.log("🛡️ [AuthGuard] Redirecting to:", destination);
+      router.replace(destination as any);
       return;
     }
 
-    // -------------------------------
-    // 3️⃣ Role-based protection (prevent cross-access)
-    // -------------------------------
-    if (!inAuthGroup) {
-      const groupRoleMap: Record<string, UserRole[]> = {
-        "(cashier)": ["cashier", "manager", "superadmin"],
-        "(manager)": ["manager", "superadmin"],
-        "(superadmin)": ["superadmin"],
-      };
+    // ─────────────────────────────────────────────────────────────
+    // 3. Role-based protection — prevent cross-group access
+    // ─────────────────────────────────────────────────────────────
+    const allowedRoles = currentGroup
+      ? GROUP_ALLOWED_ROLES[currentGroup]
+      : undefined;
 
-      const allowedRoles = groupRoleMap[currentGroup];
-
-      if (allowedRoles && !allowedRoles.includes(role)) {
-        console.warn(
-          `[AUTHGUARD] Role "${role}" not allowed in ${currentGroup}`,
-        );
-
-        const roleRedirects: Record<UserRole, string> = {
-          cashier: "/(cashier)",
-          manager: "/(manager)",
-          superadmin: "/(superadmin)",
-        };
-
-        router.replace(roleRedirects[role] as any);
+    if (allowedRoles && !allowedRoles.includes(role)) {
+      // console.log("🛡️ [AuthGuard] Role not allowed in this group, redirecting");
+      const destination = ROLE_ROUTES[role];
+      if (destination) {
+        // console.log("🛡️ [AuthGuard] Redirecting to:", destination);
+        router.replace(destination as any);
       }
+    } else {
+      // console.log("🛡️ [AuthGuard] ✅ Access granted");
     }
   }, [user, loading, segments]);
 
-  return null;
+  return <>{children}</>;
 }

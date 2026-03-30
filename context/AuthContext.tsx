@@ -1,7 +1,6 @@
 // src/context/AuthContext.tsx
-console.info("[AUTHCONTEXT] AuthContext initialized with services and secure storage");
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import {
   checkPin as apiCheckPin,
   verifyPassword as apiVerifyPassword,
@@ -10,84 +9,88 @@ import {
   User,
   TimeLog,
 } from "../services/authServices";
-// Imports authentication service functions and related types (PIN check, password verification, logout, user retrieval, and models) for managing auth logic
 import * as SecureStore from "expo-secure-store";
-// Provides secure, encrypted key-value storage for sensitive data like auth tokens on the device
+import IntroductionProgress from "@/components/common/IntroductionProgress";
+import { useToggle } from "@/hooks/useToggle";
 
 // ------------------------------
 // Types
 // ------------------------------
+export interface CheckPinResult {
+  requirePassword: boolean;
+  userId?: number;
+  user?: User;
+  timeLog?: TimeLog;
+  token?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   timeLog: TimeLog | null;
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
+  pendingUserId: number | null;
+  setPendingUserId: (id: number | null) => void;
   checkPin: (pinCode: string) => Promise<CheckPinResult>;
   verifyPassword: (userId: number, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
 
-interface CheckPinResult {
-  requirePassword: boolean;
-  userId?: number;
-}
-
 // ------------------------------
 // Create AuthContext
 // ------------------------------
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-// Initializes the authentication context, allowing app-wide access to user/session state via React Context API
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [timeLog, setTimeLog] = useState<TimeLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingUserId, setPendingUserId] = useState<number | null>(null);
   const isAuthenticated = !!user;
 
+  // Splash screen state (initial app load)
+  const [showSplash, toggleSplash] = useToggle(true);
+  const [progress, setProgress] = useState(0);
+  
+  // Auth operation overlay (PIN / Password)
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+  const [authProgress, setAuthProgress] = useState(0);
+
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   // ------------------------------
-  // Initialize auth on app load
+  // Initialize auth on app load (splash)
   // ------------------------------
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log("[AUTHCONTEXT] Initializing auth...");
-      setLoading(true);
-
       try {
-        const token = await SecureStore.getItemAsync("auth_token");
-
-        if (!token) {
-          console.log("[AUTHCONTEXT] ℹ️ No auth token found - user not logged in",);
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-
-        console.log("[AUTHCONTEXT] ✅ Token found, fetching user...");
-
-        // Token exists - fetch user
-        const userData = await getUser();
-        setUser(userData);
-        console.log("[AUTHCONTEXT] ✅ User restored from token:", userData);
-
-        // redirecte the user to the appropriate screen based on their role
-        // (this is optional and depends on your app's flow - you might want to handle this in a separate AuthGuard component instead)
+        setLoading(true);
         
-      } catch (err: any) {
-        console.error("[AUTHCONTEXT] ❌ Failed to restore user session:", err);
+        setProgress(15);
+        await delay(300);
 
+        const token = await SecureStore.getItemAsync("auth_token");
+        setProgress(50);
+        await delay(300);
+
+        if (token) {
+          const userData = await getUser();
+          setUser(userData);
+          setProgress(85);
+          await delay(300);
+        }
+      } catch (err: any) {
         if (err.response?.status === 401) {
-          console.log("[AUTHCONTEXT] ℹ️ Token invalid - clearing storage");
           await SecureStore.deleteItemAsync("auth_token");
         }
-
         setUser(null);
       } finally {
+        setProgress(100);
         setLoading(false);
+        setTimeout(() => toggleSplash(), 800);
       }
     };
 
@@ -95,76 +98,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // ------------------------------
-  // Check PIN (Step 1)
+  // Check PIN (Step 1) with progress overlay
   // ------------------------------
   const checkPin = async (pinCode: string): Promise<CheckPinResult> => {
-    console.log("[AUTHCONTEXT][checkPin] called");
     setError(null);
-    setLoading(true);
+    setShowAuthOverlay(true);
+    setAuthProgress(10);
 
     try {
-      const response = await apiCheckPin(pinCode);
+      await delay(200);
+      setAuthProgress(30);
 
-      // Case 1: Manager/Superadmin - need password
+      const response = await apiCheckPin(pinCode);
+      setAuthProgress(70);
+
       if (response.requirePassword) {
-        console.log("[AUTHCONTEXT][checkPin] Password required for user:", response.userId);
-        setLoading(false);
-        return {
-          requirePassword: true,
-          userId: response.userId,
-        };
+        setAuthProgress(100);
+        if (response.userId) setPendingUserId(response.userId);
+        // Keep overlay visible for password step; will be reset later
+        return { requirePassword: true, userId: response.userId };
       }
 
-      // Case 2: Cashier - authenticated immediately
-      console.log("[AUTHCONTEXT][checkPin] ✅ Cashier authenticated");
+      setAuthProgress(100);
       setUser(response.user!);
       setTimeLog(response.timeLog!);
-
-      return { requirePassword: false };
+      setPendingUserId(null);
+      return {
+        requirePassword: false,
+        user: response.user,
+        timeLog: response.timeLog,
+        token: response.token,
+      };
     } catch (err: any) {
-      console.error("[AUTHCONTEXT][checkPin] ❌ PIN check failed in context:", err);
-
-      // Handle specific error messages
-      const errorMessage = err.message || "User Not Found";
-      setError(errorMessage);
-      setUser(null);
-      setTimeLog(null);
-
+      setError(err.message || "PIN verification failed");
       throw err;
     } finally {
-      setLoading(false);
+      // Hide overlay after a short delay, unless we're moving to password
+      setTimeout(() => {
+        setShowAuthOverlay(false);
+        setAuthProgress(0);
+      }, 500);
     }
   };
 
   // ------------------------------
-  // Verify Password (Step 2)
+  // Verify Password (Step 2) with progress overlay
   // ------------------------------
-  const verifyPassword = async (
-    userId: number,
-    password: string,
-  ): Promise<void> => {
-    console.log("[AUTHCONTEXT][verifyPassword] called");
+  const verifyPassword = async (userId: number, password: string): Promise<void> => {
     setError(null);
-    setLoading(true);
+    setShowAuthOverlay(true);
+    setAuthProgress(10);
 
     try {
-      const response = await apiVerifyPassword(userId, password);
+      await delay(200);
+      setAuthProgress(40);
 
-      console.log("[AUTHCONTEXT][verifyPassword] ✅ Manager/Superadmin authenticated");
+      const response = await apiVerifyPassword(userId, password);
+      setAuthProgress(80);
       setUser(response.user);
       setTimeLog(response.timeLog);
+      setPendingUserId(null);
+      setAuthProgress(100);
     } catch (err: any) {
-      console.error("[AUTHCONTEXT][verifyPassword] ❌ Password verification failed in context:", err);
-
-      // Handle specific error messages
-      const errorMessage = err.message || "Wrong Password";
-      setError(errorMessage);
-      setUser(null);
-      setTimeLog(null);
-
+      setError(err.message || "Wrong Password");
       throw err;
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setShowAuthOverlay(false);
+        setAuthProgress(0);
+      }, 500);
     }
   };
 
@@ -172,18 +174,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Logout
   // ------------------------------
   const logout = async (): Promise<void> => {
-    console.log("[AUTHCONTEXT][logout] called");
     setLoading(true);
     setError(null);
-
+    
+    // Cancel overlay processes
+    setShowAuthOverlay(false);
+    setAuthProgress(0);
+    
     try {
       await apiLogout();
-      console.log("[AUTHCONTEXT][logout] ✅ Logout successful");
-    } catch (err) {
-      console.warn("[AUTHCONTEXT][logout] ⚠️ Logout API call failed, but clearing local state:", err);
+    } catch {
+      // ignore
     } finally {
       setUser(null);
       setTimeLog(null);
+      setPendingUserId(null);
       setLoading(false);
     }
   };
@@ -191,10 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // ------------------------------
   // Clear error
   // ------------------------------
-  const clearError = () => {
-    // console.log("[AUTHCONTEXT] Clearing error");
-    setError(null);
-  };
+  const clearError = () => setError(null);
 
   return (
     <AuthContext.Provider
@@ -204,6 +206,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         loading,
         error,
         isAuthenticated,
+        pendingUserId,
+        setPendingUserId,
         checkPin,
         verifyPassword,
         logout,
@@ -211,6 +215,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }}
     >
       {children}
+      
+      {/* Initial splash screen (only on app start) */}
+      <IntroductionProgress visible={showSplash} progress={progress} />
+      
+      {/* Auth operation overlay (PIN / Password) */}
+      <IntroductionProgress visible={showAuthOverlay} progress={authProgress} />
     </AuthContext.Provider>
   );
 };

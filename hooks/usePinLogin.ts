@@ -2,68 +2,59 @@ import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 
+interface CheckPinResult {
+    requirePassword: boolean;
+    userId?: number;
+    user?: { id: number; first_name: string; last_name: string; role: string; };
+    token?: string;
+}
+
 export function usePinLogin() {
-    const [pinCode, setPinCode] = useState("123456");
-    const [submitted, setSubmitted] = useState(false); // ✅ prevent double submit
+    const [pinCode, setPinCode] = useState("");
+    const [submitted, setSubmitted] = useState(false);
     const { checkPin, error, loading, clearError } = useAuth();
 
-    // Clear error on unmount
-    useEffect(() => {
-        return () => clearError();
-    }, []);
-
-    // Clear error when user types
-    useEffect(() => {
-        if (pinCode) clearError();
-    }, [pinCode]);
-
-    // 🔹 Clear PIN automatically on error
+    useEffect(() => { return () => clearError(); }, []);
+    useEffect(() => { if (pinCode) clearError(); }, [pinCode]);
     useEffect(() => {
         if (error) {
-            setPinCode(""); // clear PIN
-            setSubmitted(false); // reset submitted flag
+            setSubmitted(false);
+            setPinCode("");
         }
     }, [error]);
 
-    // 🔹 Auto-submit when PIN reaches 6 digits
-    useEffect(() => {
-        if (pinCode.length === 6 && !loading && !submitted) {
-            submitPin(pinCode);
-            setSubmitted(true);
-        } else if (pinCode.length < 6 && submitted) {
-            // Reset submitted flag if user deletes a digit
-            setSubmitted(false);
-        }
-    }, [pinCode, loading, submitted]);
-
     const submitPin = async (pin?: string) => {
         const pinToCheck = pin || pinCode;
-
         if (!pinToCheck) return;
 
         clearError();
+        setSubmitted(true);
 
         try {
-            const result = await checkPin(pinToCheck);
+            const result = await checkPin(pinToCheck) as CheckPinResult;
 
-            if (result.requirePassword) {
-                router.replace({
-                    pathname: "/(auth)/password-login-screen",
-                    params: { userId: result.userId },
-                });
+            if (result?.requirePassword) {
+                console.log("🔧 [usePinLogin] Password required for user ID:", result.userId);
+
+                // Wait a bit longer to ensure context updates
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                // Check if context was updated (optional)
+                console.log("🔧 [usePinLogin] Navigating to password screen after delay");
+                router.replace("/(auth)/password-login-screen");
             } else {
-                router.replace("/(cashier)");
+                const role = result?.user?.role;
+                if (role === "cashier") router.replace("/(cashier)/(tabs)");
+                else if (role === "manager") router.replace("/(manager)/(tabs)");
+                else if (role === "superadmin") router.replace("/(superadmin)");
+                else router.replace("/(cashier)/(tabs)");
             }
-        } catch (err) {
-            console.error("PIN submit error:", err);
+        } catch (err: any) {
+            // error is handled via AuthContext's error state
+        } finally {
+            setSubmitted(false);
         }
     };
 
-    return {
-        pinCode,
-        setPinCode,
-        submitPin,
-        error,
-        loading,
-    };
+    return { pinCode, setPinCode, submitPin, error, loading, submitted };
 }
