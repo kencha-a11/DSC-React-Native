@@ -1,41 +1,68 @@
-// src/services/productServices.ts
-import { Product } from "@/services/productServices"; // adjust import if Product is defined elsewhere
+// utils/productToFormData.ts
 
 /**
- * Convert a Product object into FormData for API submission.
- * Useful when uploading images or handling multipart/form-data requests.
+ * Converts a product payload into multipart/form-data for the API.
  *
- * @param product - Partial product data (only fields you want to send)
- * @param imageFile - Optional image file to upload
- * @returns FormData object ready for API call
+ * ProductController validation (store):
+ *   name                required|string|max:255|unique:products,name
+ *   price               required|numeric|min:0
+ *   stock_quantity      required|integer|min:0
+ *   low_stock_threshold nullable|integer|min:0
+ *   category_ids        nullable|array
+ *   category_ids.*      exists:categories,id
+ *   image               nullable|image|mimes:jpg,jpeg,png,gif|max:2048
+ *   barcode             nullable|string|max:50|unique:products,barcode  // NEW
+ *
+ * ProductController validation (update):
+ *   name                required|string|max:255
+ *   price               required|numeric|min:0
+ *   stock_quantity      required|integer|min:0
+ *   low_stock_threshold nullable|integer|min:0
+ *   category_ids        nullable|array
+ *   category_ids.*      exists:categories,id
+ *   image               nullable|image|mimes:jpg,jpeg,png,gif|max:2048
+ *   remove_image        nullable|boolean
+ *   barcode             nullable|string|max:50|unique:products,barcode,{id}  // NEW
  */
-export const productToFormData = (
-    product: Partial<Product>,
-    imageFile?: File
-): FormData => {
-    const formData = new FormData();
 
-    if (product.name) formData.append("name", product.name);
-    if (product.price) formData.append("price", product.price);
-    if (product.stock_quantity !== undefined) {
-        formData.append("stock_quantity", product.stock_quantity.toString());
-    }
-    if (product.low_stock_threshold !== undefined) {
-        formData.append("low_stock_threshold", product.low_stock_threshold.toString());
-    }
-    if (product.barcode) formData.append("barcode", product.barcode);
+export interface ProductPayload {
+    name?: string;
+    price?: number | string;
+    stock_quantity?: number | string;
+    low_stock_threshold?: number | string;
+    category_ids?: number[];
+    remove_image?: boolean;
+    barcode?: string | null; // NEW
+    [key: string]: any;
+}
 
-    // Handle categories
-    if (product.categories && Array.isArray(product.categories)) {
-        product.categories.forEach((cat: { id: number }, index: number) => {
-            formData.append(`category_ids[${index}]`, cat.id.toString());
-        });
+export const productToFormData = (product: ProductPayload, imageFile?: any): FormData => {
+    const form = new FormData();
+
+    const fields = ['name', 'price', 'stock_quantity', 'low_stock_threshold'] as const;
+    fields.forEach(field => {
+        if (product[field] !== undefined) {
+            form.append(field, String(product[field]).trim());
+        }
+    });
+
+    product.category_ids?.forEach(id => form.append("category_ids[]", String(id)));
+
+    // NEW: Add barcode if present
+    if (product.barcode !== undefined && product.barcode !== null && product.barcode.trim() !== "") {
+        form.append("barcode", product.barcode.trim());
     }
 
-    // Handle image
+    if (product.remove_image !== undefined) {
+        form.append("remove_image", product.remove_image ? "1" : "0");
+    }
+
     if (imageFile) {
-        formData.append("image_path", imageFile);
+        const file = imageFile.uri
+            ? { uri: imageFile.uri, type: imageFile.type ?? "image/jpeg", name: imageFile.name ?? "image.jpg" }
+            : imageFile;
+        form.append("image", file);
     }
 
-    return formData;
+    return form;
 };
