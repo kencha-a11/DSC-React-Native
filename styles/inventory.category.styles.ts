@@ -1,0 +1,268 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    modalContent: {
+        width: "90%",
+        maxHeight: "90%",
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        overflow: "hidden",
+    },
+    errorModalContent: {
+        padding: 24,
+        alignItems: "center",
+    },
+    errorIconContainer: {
+        marginBottom: 16,
+    },
+    errorTitle: {
+        fontSize: 20,
+        fontWeight: "bold",
+        color: "#333",
+        marginBottom: 8,
+        textAlign: "center",
+    },
+    errorMessage: {
+        fontSize: 14,
+        color: "#666",
+        textAlign: "center",
+        marginBottom: 20,
+    },
+    errorButton: {
+        backgroundColor: "#ED277C",
+        paddingHorizontal: 32,
+        paddingVertical: 12,
+        borderRadius: 8,
+        minWidth: 120,
+    },
+    errorButtonText: {
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: "600",
+        textAlign: "center",
+    },
+    header: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+        backgroundColor: "#fff",
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "#333",
+    },
+    closeButton: {
+        padding: 4,
+    },
+    scrollView: {
+        maxHeight: "70%",
+    },
+    section: {
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    sectionHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#333",
+    },
+    sectionSubtitle: {
+        fontSize: 12,
+        color: "#ED277C",
+        fontWeight: "500",
+    },
+    inputContainer: {
+        marginBottom: 12,
+    },
+    label: {
+        fontSize: 14,
+        color: "#666",
+        marginBottom: 4,
+        fontWeight: "500",
+    },
+    required: {
+        color: "#F44336",
+    },
+    input: {
+        height: 45,
+        borderWidth: 1,
+        borderColor: "#e0e0e0",
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        fontSize: 14,
+        color: "#333",
+        backgroundColor: "#fff",
+    },
+    inputError: {
+        borderColor: "#F44336",
+    },
+    errorText: {
+        color: "#F44336",
+        fontSize: 12,
+        marginTop: 2,
+    },
+    searchContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#e0e0e0",
+        borderRadius: 8,
+        backgroundColor: "#f8f8f8",
+        paddingHorizontal: 10,
+        height: 40,
+        marginBottom: 12,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        height: 40,
+        fontSize: 14,
+        color: "#333",
+    },
+    dualListContainer: {
+        flexDirection: "row",
+        gap: 12,
+        minHeight: 300,
+    },
+    listContainer: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: "#e0e0e0",
+        borderRadius: 8,
+        backgroundColor: "#f8f8f8",
+        overflow: "hidden",
+    },
+    listHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: "#e0e0e0",
+        backgroundColor: "#fff",
+    },
+    listTitle: {
+        fontSize: 12,
+        fontWeight: "600",
+        color: "#666",
+    },
+    selectAllText: {
+        fontSize: 11,
+        color: "#4CAF50",
+        fontWeight: "600",
+    },
+    removeAllText: {
+        fontSize: 11,
+        color: "#F44336",
+        fontWeight: "600",
+    },
+    list: {
+        maxHeight: 250,
+    },
+    listLoader: {
+        padding: 20,
+        alignItems: "center",
+    },
+    emptyList: {
+        padding: 20,
+        alignItems: "center",
+    },
+    emptyListText: {
+        fontSize: 12,
+        color: "#999",
+        textAlign: "center",
+    },
+    productImageContainer: {
+        width: 40,
+        height: 40,
+        marginRight: 12,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: "#e0e0e0",
+        backgroundColor: "#f8f8f8",
+        overflow: "hidden",
+    },
+    productImage: {
+        width: "100%",
+        height: "100%",
+    },
+    listItem: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: "#e0e0e0",
+        backgroundColor: "#fff",
+    },
+    itemInfo: {
+        flex: 1,
+        marginRight: 8,
+    },
+    itemName: {
+        fontSize: 13,
+        fontWeight: "500",
+        color: "#333",
+        marginBottom: 2,
+    },
+    itemDetails: {
+        fontSize: 11,
+        color: "#999",
+    },
+    footer: {
+        flexDirection: "row",
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: "#f0f0f0",
+        backgroundColor: "#fff",
+        gap: 12,
+    },
+    button: {
+        flex: 1,
+        height: 45,
+        justifyContent: "center",
+        alignItems: "center",
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    cancelButton: {
+        backgroundColor: "#f5f5f5",
+        borderColor: "#e0e0e0",
+    },
+    submitButton: {
+        backgroundColor: "#ED277C",
+        borderColor: "#ED277C",
+    },
+    submitButtonDisabled: {
+        opacity: 0.5,
+    },
+    cancelButtonText: {
+        color: "#666",
+        fontSize: 14,
+        fontWeight: "600",
+    },
+    submitButtonText: {
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: "600",
+    },
+});
