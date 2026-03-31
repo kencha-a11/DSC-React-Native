@@ -14,7 +14,6 @@ interface TabItem {
   library: "FontAwesome5" | "MaterialIcons";
 }
 
-// Helper component to render the correct icon
 const TabIcon = ({ library, name, color }: { library: TabItem["library"]; name: TabItem["icon"]; color: string }) => {
   if (library === "FontAwesome5") {
     return <FontAwesome5 name={name as FontAwesome5IconName} size={22} color={color} />;
@@ -39,7 +38,7 @@ function CustomTabBar({ state, navigation }: any) {
     ...(hasInventoryAccess
       ? [
         {
-          name: "inventory",
+          name: "cashier-inventory",
           title: "Inventory",
           icon: "inventory" as MaterialIconName,
           library: "MaterialIcons" as const,
@@ -74,8 +73,8 @@ function CustomTabBar({ state, navigation }: any) {
       // Navigate using Expo Router – explicit literals to satisfy TypeScript
       if (tabName === "index") {
         router.push("/(cashier)/(tabs)");
-      } else if (tabName === "inventory") {
-        router.push("/(cashier)/(tabs)/inventory");
+      } else if (tabName === "cashier-inventory") {
+        router.push("/(cashier)/(tabs)/cashier-inventory");
       } else if (tabName === "profile") {
         router.push("/(cashier)/(tabs)/profile");
       }
@@ -140,7 +139,7 @@ export default function TabLayout() {
       tabBar={(props) => <CustomTabBar {...props} />}
     >
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="inventory" />
+      <Tabs.Screen name="cashier-inventory" />
       <Tabs.Screen name="profile" />
     </Tabs>
   );

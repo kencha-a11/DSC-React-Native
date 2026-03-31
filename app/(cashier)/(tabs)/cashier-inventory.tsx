@@ -1,39 +1,39 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-} from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import Header from "@/components/layout/Header";
-import Search from "@/components/common/Search";
 import DscToast from "@/components/common/DscToast";
-import AddProductModal from "@/components/inventory/AddProductModal";
-import EditProductModal from "@/components/inventory/EditProductModal";
-import RestockProductModal from "@/components/inventory/RestockProductModal";
-import DeductProductModal from "@/components/inventory/DeductProductModal";
-import RemoveProductModal from "@/components/inventory/RemoveProductModal";
+import Search from "@/components/common/Search";
 import AddCategoryModal from "@/components/inventory/AddCategoryModal";
+import AddProductModal from "@/components/inventory/AddProductModal";
 import CategoryManagementModal from "@/components/inventory/CategoryManagementModal";
 import FilterChip from "@/components/inventory/components/FilterChip";
+import DeductProductModal from "@/components/inventory/DeductProductModal";
+import EditProductModal from "@/components/inventory/EditProductModal";
+import RemoveProductModal from "@/components/inventory/RemoveProductModal";
+import RestockProductModal from "@/components/inventory/RestockProductModal";
+import Header from "@/components/layout/Header";
 
-import { usePermissions } from "@/context/PermissionContext";
-import { useProducts, ProductWithDisplay } from "@/context/ProductContext";
-import { useCategories } from "@/context/CategoryContext";
-import { styles } from "@/styles/inventory.styles";
 import {
   SEARCH_DEBOUNCE_MS,
-  TOAST_DURATION,
   STOCK_STATUS_COLORS,
   STOCK_STATUS_OPTIONS,
+  TOAST_DURATION,
 } from "@/constants/inventory.constants";
+import { useCategories } from "@/context/CategoryContext";
+import { usePermissions } from "@/context/PermissionContext";
+import { ProductWithDisplay, useProducts } from "@/context/ProductContext";
+import { styles } from "@/styles/inventory.styles";
 
 type ModalType =
   | "addProduct"
@@ -154,7 +154,7 @@ const ProductCard = React.memo<ProductCardProps>(({
   );
 });
 
-export default function InventoryScreen() {
+export default function CashierInventoryScreen() {
   const { hasPermission } = usePermissions();
   const {
     products,
