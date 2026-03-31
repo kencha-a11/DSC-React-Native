@@ -470,9 +470,6 @@ export default function EditProductModal({
                   Barcode <Text style={styles.optional}>(Optional)</Text>
                 </Text>
                 <View style={styles.barcodeContainer}>
-                  <View style={styles.barcodeIcon}>
-                    <Ionicons name="barcode-outline" size={20} color="#ED277C" />
-                  </View>
                   <TextInput
                     style={[styles.input, styles.barcodeInput, errors.barcode && styles.inputError]}
                     placeholder="Enter barcode (e.g., 1234567890)"
