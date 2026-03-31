@@ -144,7 +144,7 @@ export const ProductProvider = ({ children }: { children: React.ReactNode }) => 
     }
   }, [isAuthenticated, refreshProducts]);
 
-  const restockProduct = useCallback(async (id: number, quantity: number) => {
+const restockProduct = useCallback(async (id: number, quantity: number) => {
     if (!isAuthenticated) throw new Error("Not authenticated");
     setLoading(true);
     try {
