@@ -5,21 +5,18 @@ export default function ManagerLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: false, // 👈 Hide header for ALL screens
+        headerShown: false,
       }}
     >
-      {/* Tabs screen - may tabs ito */}
       <Stack.Screen name="(tabs)" />
 
-      {/* Create Account - Step 1 */}
       <Stack.Screen
         name="account/create/step1"
         options={{
-          presentation: "card", // or "modal" if gusto mo modal effect
+          presentation: "card",
         }}
       />
 
-      {/* Create Account - Step 2 */}
       <Stack.Screen
         name="account/create/step2"
         options={{
@@ -27,15 +24,13 @@ export default function ManagerLayout() {
         }}
       />
 
-      {/* Account screen */}
       <Stack.Screen
-        name="account/[id]/index.tsx"
+        name="account/[id]/index"
         options={{
           presentation: "card",
         }}
       />
 
-      {/* Edit Account screen */}
       <Stack.Screen
         name="account/[id]/edit"
         options={{
@@ -43,10 +38,11 @@ export default function ManagerLayout() {
         }}
       />
 
-      {/* Permission Account screen */}
       <Stack.Screen
-        name="account/[id]/permission"
-        options={{ presentation: "card" }}
+        name="account/[id]/permissions"
+        options={{ 
+          presentation: "card" 
+        }}
       />
     </Stack>
   );
