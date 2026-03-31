@@ -1,262 +1,243 @@
-// app/(manager)/(tabs)/index.tsx
-import DscToast from "@/components/common/DscToast";
-import { FontAwesome5 } from "@expo/vector-icons";
-import { useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+  StatsGrid,
+  SalesTrendChart,
+  CategoryPerformanceChart,
+  TopProductsList,
+  RecentTransactions,
+  InventoryAlerts,
+  LoadingScreen,
+  ErrorScreen,
+} from '@/components/dashboard';
+import Header from "@/components/layout/Header";
+import {
+  getDashboardStats,
+  getDailySalesTrend,
+  getCategoryPerformance,
+  getTopProducts,
+  getRecentTransactions,
+} from '@/services/dashboard';
+import { useProducts } from '@/context/ProductContext';
 
-export default function DashboardScreen() {
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastType, setToastType] = useState<
-    "success" | "error" | "warning" | "info"
-  >("success");
+// Types (same as before)
+interface DashboardStats {
+  totalSales: number;
+  totalRevenue: number;
+  totalProducts: number;
+  totalUsers: number;
+  lowStockItems: number;
+  outOfStockItems: number;
+  activeUsers: number;
+  avgTransactionValue: number;
+}
 
-  const showToast = (
-    type: "success" | "error" | "warning" | "info",
-    message: string,
-  ) => {
-    setToastType(type);
-    setToastMessage(message);
-    setToastVisible(true);
+interface DailySales {
+  date: string;
+  amount: number;
+  transactions: number;
+}
+
+interface TopProduct {
+  id: number;
+  name: string;
+  quantity_sold: number;
+  revenue: number;
+  category: string;
+}
+
+interface CategoryPerformance {
+  category: string;
+  revenue: number;
+  items_sold: number;
+}
+
+interface RecentTransaction {
+  id: number;
+  user_id: number;
+  total_amount: number;
+  created_at: string;
+  user_name: string;
+}
+
+const DashboardScreen: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // State for dashboard data
+  const [stats, setStats] = useState<DashboardStats>({
+    totalSales: 0,
+    totalRevenue: 0,
+    totalProducts: 0,
+    totalUsers: 0,
+    lowStockItems: 0,
+    outOfStockItems: 0,
+    activeUsers: 0,
+    avgTransactionValue: 0,
+  });
+  const [dailySales, setDailySales] = useState<DailySales[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [categoryPerformance, setCategoryPerformance] = useState<CategoryPerformance[]>([]);
+  const [recentSales, setRecentSales] = useState<RecentTransaction[]>([]);
+
+  // Access product context to listen for changes
+  const { products, refreshProducts } = useProducts();
+
+  // Compute inventory alerts locally from the fresh products list
+  const inventoryAlerts = React.useMemo(() => {
+    const alerts = products.filter(p => p.status === 'low stock' || p.status === 'out of stock');
+    console.log('Dashboard: inventoryAlerts recomputed', alerts.length);
+    return alerts;
+  }, [products]);
+
+  // Ref to store the previous quantity fingerprint
+  const prevQuantityFingerprint = useRef<string>('');
+  // Ref to prevent multiple concurrent data fetches
+  const isFetchingRef = useRef(false);
+  // Ref for debouncing auto-refresh after product quantity changes
+  const autoRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Helper: compute a unique fingerprint of product IDs and stock quantities
+  const getQuantityFingerprint = (products: any[]) => {
+    const fingerprint = products
+      .slice()
+      .sort((a, b) => a.id - b.id)
+      .map(p => `${p.id}:${p.stock_quantity}`)
+      .join('|');
+    console.log('Dashboard: fingerprint generated', fingerprint.slice(0, 100));
+    return fingerprint;
   };
 
+  const fetchDashboardData = useCallback(async (showLoading = true) => {
+    if (isFetchingRef.current) {
+      console.log('Dashboard: fetch already in progress, skipping');
+      setRefreshing(false);
+      return;
+    }
+    isFetchingRef.current = true;
+    if (showLoading) setLoading(true);
+    console.log('Dashboard: fetching data...');
+
+    try {
+      const [
+        statsData,
+        dailySalesData,
+        categoryData,
+        topProductsData,
+        recentTransactionsData,
+      ] = await Promise.all([
+        getDashboardStats(),
+        getDailySalesTrend(7),
+        getCategoryPerformance(),
+        getTopProducts(5),
+        getRecentTransactions(5),
+      ]);
+
+      setStats({
+        totalSales: statsData.total_sales,
+        totalRevenue: statsData.total_revenue,
+        totalProducts: statsData.total_products,
+        totalUsers: statsData.total_users,
+        lowStockItems: statsData.low_stock_items,
+        outOfStockItems: statsData.out_of_stock_items,
+        activeUsers: statsData.active_users,
+        avgTransactionValue: statsData.avg_transaction_value,
+      });
+      setDailySales(dailySalesData);
+      setCategoryPerformance(categoryData);
+      setTopProducts(topProductsData);
+      setRecentSales(recentTransactionsData);
+
+      setError(null);
+      console.log('Dashboard: data fetched successfully');
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError('Failed to load dashboard data. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+      isFetchingRef.current = false;
+    }
+  }, []);
+
+  // Manual refresh (pull-to-refresh)
+  const onRefresh = async () => {
+    console.log('Dashboard: manual refresh triggered');
+    setRefreshing(true);
+    await fetchDashboardData(true);
+  };
+
+  // Auto-refresh ONLY when product quantities change
+  useEffect(() => {
+    console.log('Dashboard: products changed, length:', products.length);
+    if (products.length === 0) {
+      prevQuantityFingerprint.current = getQuantityFingerprint(products);
+      console.log('Dashboard: initial fingerprint set (empty)');
+      return;
+    }
+
+    const currentFingerprint = getQuantityFingerprint(products);
+    console.log('Dashboard: prev fingerprint:', prevQuantityFingerprint.current.slice(0, 100));
+    console.log('Dashboard: current fingerprint:', currentFingerprint.slice(0, 100));
+    if (prevQuantityFingerprint.current && prevQuantityFingerprint.current !== currentFingerprint) {
+      console.log('Dashboard: fingerprint changed, scheduling refresh');
+      if (autoRefreshTimeoutRef.current) clearTimeout(autoRefreshTimeoutRef.current);
+      autoRefreshTimeoutRef.current = setTimeout(() => {
+        if (!loading && !refreshing) {
+          console.log('Dashboard: executing background refresh after fingerprint change');
+          fetchDashboardData(false);
+        } else {
+          console.log('Dashboard: refresh skipped, loading or refreshing is true');
+        }
+      }, 500);
+    } else {
+      console.log('Dashboard: fingerprint unchanged, no refresh');
+    }
+    prevQuantityFingerprint.current = currentFingerprint;
+  }, [products, fetchDashboardData, loading, refreshing]);
+
+  // Initial load
+  useEffect(() => {
+    console.log('Dashboard: initial load');
+    fetchDashboardData(true);
+  }, [fetchDashboardData]);
+
+  if (loading && !refreshing) return <LoadingScreen />;
+  if (error) return <ErrorScreen error={error} onRetry={onRefresh} />;
+
   return (
-    <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header with Demo Buttons */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Dashboard</Text>
-          <View style={styles.demoButtons}>
-            <TouchableOpacity
-              style={[styles.demoButton, { backgroundColor: "#34C759" }]}
-              onPress={() =>
-                showToast("success", "Dashboard loaded successfully!")
-              }
-            >
-              <Text style={styles.demoButtonText}>Test</Text>
-            </TouchableOpacity>
-          </View>
+    <>
+      <Header title="Dashboard" showBackButton={false} />
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3B82F6']} />
+        }
+      >
+        <View style={styles.content}>
+          <StatsGrid stats={stats} />
+          <SalesTrendChart dailySales={dailySales} />
+          <CategoryPerformanceChart categories={categoryPerformance} />
+          <TopProductsList products={topProducts} />
+          <RecentTransactions sales={recentSales} />
+          <InventoryAlerts products={inventoryAlerts as any} onRefresh={onRefresh} />
         </View>
-
-        {/* Stats Cards */}
-        <View style={styles.statsRow}>
-          {/* Total Sales Card */}
-          <View style={[styles.statCard, styles.salesCard]}>
-            <View style={styles.statHeader}>
-              <Text style={styles.statLabel}>Total Sales</Text>
-              <FontAwesome5 name="arrow-up" size={16} color="#34C759" />
-            </View>
-            <Text style={styles.salesAmount}>₱ 7,932.00</Text>
-            <View style={styles.percentageBadge}>
-              <Text style={styles.percentageText}>↑ 16%</Text>
-            </View>
-          </View>
-
-          {/* Total Items Sold Card */}
-          <View style={[styles.statCard, styles.itemsCard]}>
-            <Text style={styles.statLabel}>Total items sold</Text>
-            <Text style={styles.itemsAmount}>392 pcs</Text>
-          </View>
-        </View>
-
-        {/* Sales Trend Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sales trend</Text>
-          <View style={styles.monthsContainer}>
-            {["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => (
-              <View key={month} style={styles.monthItem}>
-                <View style={styles.monthBar} />
-                <Text style={styles.monthLabel}>{month}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Top Selling Items */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top-selling items</Text>
-
-          <View style={styles.topItem}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>Souvenir</Text>
-              <Text style={styles.itemSold}>130pcs sold</Text>
-            </View>
-            <View style={[styles.progressBar, { width: "65%" }]} />
-          </View>
-
-          <View style={styles.topItem}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>Notebook</Text>
-              <Text style={styles.itemSold}>110pcs sold</Text>
-            </View>
-            <View style={[styles.progressBar, { width: "55%" }]} />
-          </View>
-        </View>
-
-        <View style={{ height: 20 }} />
       </ScrollView>
-
-      {/* Toast */}
-      <DscToast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        onClose={() => setToastVisible(false)}
-        showCloseButton={true}
-      />
-    </View>
+    </>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: '#F9FAFB',
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#000",
-  },
-  demoButtons: {
-    flexDirection: "row",
-  },
-  demoButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  demoButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  statsRow: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 15,
-    marginBottom: 25,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 16,
+  content: {
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  salesCard: {},
-  itemsCard: {},
-  statHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: "#666",
-  },
-  salesAmount: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 4,
-  },
-  itemsAmount: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#000",
-    marginTop: 8,
-  },
-  percentageBadge: {
-    backgroundColor: "#E8F5E9",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    alignSelf: "flex-start",
-  },
-  percentageText: {
-    color: "#34C759",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  section: {
-    backgroundColor: "#fff",
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#000",
-    marginBottom: 20,
-  },
-  monthsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    height: 120,
-  },
-  monthItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  monthBar: {
-    width: "60%",
-    height: 80,
-    backgroundColor: "#ED277C",
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  monthLabel: {
-    fontSize: 12,
-    color: "#666",
-  },
-  topItem: {
-    marginBottom: 20,
-  },
-  itemInfo: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#000",
-  },
-  itemSold: {
-    fontSize: 14,
-    color: "#666",
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: "#ED277C",
-    borderRadius: 4,
+    paddingBottom: 32,
   },
 });
+
+export default DashboardScreen;

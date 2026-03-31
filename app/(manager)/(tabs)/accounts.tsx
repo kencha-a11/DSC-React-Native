@@ -12,6 +12,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useState, useCallback, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { accountService, AccountResponse } from "@/services/accountService";
+import Header from "@/components/layout/Header";
 
 // Constants
 const ROLE_STYLES = {
@@ -167,10 +168,11 @@ export default function AccountsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Accounts</Text>
-        <Ionicons name="menu" size={24} color="#ED277C" />
-      </View>
+      <Header 
+        title="Accounts"
+        showBackButton={false}
+      />
+
 
       {/* Search */}
       <View style={styles.searchContainer}>
@@ -244,6 +246,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     borderRadius: 12,
     paddingHorizontal: 15,
+    marginTop: 20,
     marginBottom: 20,
     height: 50,
   },

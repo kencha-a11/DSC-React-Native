@@ -1,21 +1,30 @@
-// app/(cashier)/(tabs)/profile.tsx
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, StatusBar } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Platform,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/context/PermissionContext";
 import Header from "@/components/layout/Header";
 import LogoutButton from "@/components/common/LogoutButton";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function ProfileScreen() {
   const { user } = useAuth();
   const { permissions } = usePermissions();
+  const insets = useSafeAreaInsets();
 
-  // Count enabled permissions
+  // Match your custom tab bar height (adjust if needed)
+  const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 60 : 80;
+  const bottomPadding = TAB_BAR_HEIGHT + insets.bottom;
+
   const enabledPermissions = Object.values(permissions).filter(Boolean).length;
   const totalPermissions = Object.keys(permissions).length;
 
-  // Get full name from first_name and last_name
   const getFullName = () => {
     if (user?.first_name && user?.last_name) {
       return `${user.first_name} ${user.last_name}`;
@@ -23,33 +32,28 @@ export default function ProfileScreen() {
     return "Cashier User";
   };
 
-  // Get initials from first_name and last_name
   const getInitials = () => {
-    if (!user?.first_name && !user?.last_name) return "U";
     const first = user?.first_name?.charAt(0) || "";
     const last = user?.last_name?.charAt(0) || "";
-    return (first + last).toUpperCase();
+    return (first + last).toUpperCase() || "U";
   };
 
-  // Header right component (empty for profile)
-  const HeaderRight = <View style={styles.placeholder} />;
+  const role = user?.role
+    ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+    : "Cashier";
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* Header - using your custom component */}
       <Header
         title="Profile"
         showBackButton={false}
         backgroundColor="#fff"
         titleColor="#333"
-        rightComponent={HeaderRight}
+        rightComponent={<View style={styles.placeholder} />}
       />
-
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: bottomPadding }}
       >
         {/* Profile Card */}
         <View style={styles.profileCard}>
@@ -58,15 +62,9 @@ export default function ProfileScreen() {
               <Text style={styles.avatarText}>{getInitials()}</Text>
             </View>
           </View>
-
           <Text style={styles.userName}>{getFullName()}</Text>
-
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>
-              {user?.role
-                ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
-                : "Cashier"}
-            </Text>
+            <Text style={styles.roleText}>{role}</Text>
           </View>
         </View>
 
@@ -79,7 +77,6 @@ export default function ProfileScreen() {
               {user?.email || "No email"}
             </Text>
           </View>
-
           <View style={styles.infoCard}>
             <Ionicons name="call-outline" size={24} color="#ED277C" />
             <Text style={styles.infoLabel}>Phone</Text>
@@ -92,21 +89,15 @@ export default function ProfileScreen() {
         {/* Permissions Summary */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons
-              name="shield-checkmark-outline"
-              size={20}
-              color="#ED277C"
-            />
+            <Ionicons name="shield-checkmark-outline" size={20} color="#ED277C" />
             <Text style={styles.sectionTitle}>Permissions</Text>
           </View>
-
           <View style={styles.permissionSummary}>
             <Text style={styles.permissionCount}>
               {enabledPermissions} / {totalPermissions}
             </Text>
             <Text style={styles.permissionLabel}>enabled</Text>
           </View>
-
           <View style={styles.permissionBar}>
             <View
               style={[
@@ -120,40 +111,23 @@ export default function ProfileScreen() {
         {/* Account Details */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons
-              name="information-circle-outline"
-              size={20}
-              color="#ED277C"
-            />
+            <Ionicons name="information-circle-outline" size={20} color="#ED277C" />
             <Text style={styles.sectionTitle}>Account Details</Text>
           </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoRowLabel}>Account ID</Text>
-            <Text style={styles.infoRowValue}>#{user?.id || "N/A"}</Text>
-          </View>
-
           <View style={styles.infoRow}>
             <Text style={styles.infoRowLabel}>First Name</Text>
             <Text style={styles.infoRowValue}>{user?.first_name || "N/A"}</Text>
           </View>
-
           <View style={styles.infoRow}>
             <Text style={styles.infoRowLabel}>Last Name</Text>
             <Text style={styles.infoRowValue}>{user?.last_name || "N/A"}</Text>
           </View>
-
           <View style={styles.infoRow}>
             <Text style={styles.infoRowLabel}>Role</Text>
-            <Text style={styles.infoRowValue}>
-              {user?.role
-                ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
-                : "N/A"}
-            </Text>
+            <Text style={styles.infoRowValue}>{role}</Text>
           </View>
         </View>
 
-        {/* Logout Button - Using your component */}
         <LogoutButton />
       </ScrollView>
     </View>
@@ -163,14 +137,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#fff",
   },
   placeholder: {
     width: 24,
     height: 24,
-  },
-  scrollContent: {
-    paddingBottom: 30,
   },
   profileCard: {
     backgroundColor: "#fff",
