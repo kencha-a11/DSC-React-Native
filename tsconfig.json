@@ -10,7 +10,8 @@
     "jsx": "react-native",
     "moduleResolution": "bundler", // ✅ Pinakamoderno para sa Expo
     "skipLibCheck": true,  // This helps avoid similar errors
-    "types": ["jest", "node"],
+    // "types": ["jest", "node"],
+    "types": ["node"],
     "esModuleInterop": true,
   },
   "include": [

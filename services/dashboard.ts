@@ -1,20 +1,12 @@
 // services/api/dashboard.ts
 import api from '@/api/axios';
 
-// Helper to add cache-busting timestamp
-const withCacheBust = (params?: Record<string, any>) => {
-    return {
-        ...params,
-        _t: Date.now(),
-    };
-};
-
 interface DateRange {
     start_date?: string;
     end_date?: string;
 }
 
-interface DashboardStats {
+export interface DashboardStats {
     total_sales: number;
     total_revenue: number;
     total_products: number;
@@ -25,19 +17,20 @@ interface DashboardStats {
     avg_transaction_value: number;
 }
 
-interface DailySalesItem {
+export interface DailySalesItem {
     date: string;
     amount: number;
     transactions: number;
 }
 
-interface CategoryPerformanceItem {
+export interface CategoryPerformanceItem {
+    // FIX #4: Matches the 'as category' alias in the controller SELECT
     category: string;
     revenue: number;
     items_sold: number;
 }
 
-interface TopProduct {
+export interface TopProduct {
     id: number;
     name: string;
     quantity_sold: number;
@@ -45,7 +38,7 @@ interface TopProduct {
     category: string;
 }
 
-interface RecentTransaction {
+export interface RecentTransaction {
     id: number;
     user_id: number;
     total_amount: number;
@@ -53,7 +46,7 @@ interface RecentTransaction {
     user_name: string;
 }
 
-interface InventoryAlert {
+export interface InventoryAlert {
     id: number;
     name: string;
     stock_quantity: number;
@@ -61,7 +54,7 @@ interface InventoryAlert {
     low_stock_threshold: number;
 }
 
-interface KRI {
+export interface KRI {
     id: string;
     name: string;
     value: number;
@@ -74,25 +67,23 @@ interface KRI {
     history: { period: string; value: number }[];
 }
 
-interface RIPerformance {
-    [key: string]: {
-        value: number;
-        target: number;
-        unit: string;
-        trend: number;
-        status: string;
-        formula?: string;
-        benchmark?: string;
-    };
+export interface RIMetric {
+    value: number;
+    target: number;
+    unit: string;
+    trend: number;
+    status: string;
+    formula?: string;
+    benchmark?: string;
 }
 
-interface RIsAndPIs {
-    sales_performance: Record<string, RIPerformance>;
-    operational_efficiency: Record<string, RIPerformance>;
-    customer_satisfaction: Record<string, RIPerformance>;
+export interface RIsAndPIs {
+    sales_performance: Record<string, RIMetric>;
+    operational_efficiency: Record<string, RIMetric>;
+    customer_satisfaction: Record<string, RIMetric>;
 }
 
-interface WinningKPI {
+export interface WinningKPI {
     id: string;
     name: string;
     value: number;
@@ -108,124 +99,104 @@ interface WinningKPI {
     history: { period: string; value: number }[];
 }
 
-interface CompleteDashboardData {
-    stats: DashboardStats;
-    daily_sales: DailySalesItem[];
-    category_performance: CategoryPerformanceItem[];
-    top_products: TopProduct[];
-    recent_transactions: RecentTransaction[];
-    inventory_alerts: InventoryAlert[];
-    kris: KRI[];
-    ri_pi: RIsAndPIs;
-    winning_kpis: WinningKPI[];
+export interface CompleteDashboardData {
+    stats: DashboardStats | null;
+    daily_sales: DailySalesItem[] | null;
+    category_performance: CategoryPerformanceItem[] | null;
+    top_products: TopProduct[] | null;
+    recent_transactions: RecentTransaction[] | null;
+    inventory_alerts: InventoryAlert[] | null;
+    kris: KRI[] | null;
+    ri_pi: RIsAndPIs | null;
+    winning_kpis: WinningKPI[] | null;
 }
 
-/**
- * Get dashboard statistics (top cards)
- * @param dateRange Optional start/end dates
- */
+// ─── Individual endpoints ────────────────────────────────────────────────────
+
 export const getDashboardStats = async (dateRange?: DateRange): Promise<DashboardStats> => {
-    const response = await api.get<{ success: boolean; data: DashboardStats }>('/dashboard/stats', {
-        params: withCacheBust(dateRange),
-    });
+    const response = await api.get<{ success: boolean; data: DashboardStats }>(
+        '/dashboard/stats',
+        { params: dateRange },
+    );
     return response.data.data;
 };
 
-/**
- * Get daily sales trend for the last N days
- * @param days Number of days (default 7)
- */
 export const getDailySalesTrend = async (days: number = 7): Promise<DailySalesItem[]> => {
-    const response = await api.get<{ success: boolean; data: DailySalesItem[] }>('/dashboard/daily-sales', {
-        params: withCacheBust({ days }),
-    });
+    const response = await api.get<{ success: boolean; data: DailySalesItem[] }>(
+        '/dashboard/daily-sales',
+        { params: { days } },
+    );
     return response.data.data;
 };
 
-/**
- * Get category performance
- * @param dateRange Optional start/end dates
- */
 export const getCategoryPerformance = async (dateRange?: DateRange): Promise<CategoryPerformanceItem[]> => {
-    const response = await api.get<{ success: boolean; data: CategoryPerformanceItem[] }>('/dashboard/category-performance', {
-        params: withCacheBust(dateRange),
-    });
+    const response = await api.get<{ success: boolean; data: CategoryPerformanceItem[] }>(
+        '/dashboard/category-performance',
+        { params: dateRange },
+    );
     return response.data.data;
 };
 
-/**
- * Get top performing products
- * @param limit Number of products to return (default 5)
- * @param dateRange Optional start/end dates
- */
-export const getTopProducts = async (limit: number = 5, dateRange?: DateRange): Promise<TopProduct[]> => {
-    const response = await api.get<{ success: boolean; data: TopProduct[] }>('/dashboard/top-products', {
-        params: withCacheBust({ limit, ...dateRange }),
-    });
+export const getTopProducts = async (
+    limit: number = 5,
+    dateRange?: DateRange,
+): Promise<TopProduct[]> => {
+    const response = await api.get<{ success: boolean; data: TopProduct[] }>(
+        '/dashboard/top-products',
+        { params: { limit, ...dateRange } },
+    );
     return response.data.data;
 };
 
-/**
- * Get recent transactions
- * @param limit Number of transactions (default 5)
- */
 export const getRecentTransactions = async (limit: number = 5): Promise<RecentTransaction[]> => {
-    const response = await api.get<{ success: boolean; data: RecentTransaction[] }>('/dashboard/recent-transactions', {
-        params: withCacheBust({ limit }),
-    });
+    const response = await api.get<{ success: boolean; data: RecentTransaction[] }>(
+        '/dashboard/recent-transactions',
+        { params: { limit } },
+    );
     return response.data.data;
 };
 
-/**
- * Get inventory alerts (low stock and out of stock)
- */
 export const getInventoryAlerts = async (): Promise<InventoryAlert[]> => {
-    const response = await api.get<{ success: boolean; data: InventoryAlert[] }>('/dashboard/inventory-alerts', {
-        params: withCacheBust(),
-    });
+    const response = await api.get<{ success: boolean; data: InventoryAlert[] }>(
+        '/dashboard/inventory-alerts',
+    );
     return response.data.data;
 };
 
-/**
- * Get Key Result Indicators (KRIs) – Top 10% strategic metrics
- * @param dateRange Optional start/end dates
- */
 export const getKRIs = async (dateRange?: DateRange): Promise<KRI[]> => {
-    const response = await api.get<{ success: boolean; data: KRI[] }>('/dashboard/kris', {
-        params: withCacheBust(dateRange),
-    });
+    const response = await api.get<{ success: boolean; data: KRI[] }>(
+        '/dashboard/kris',
+        { params: dateRange },
+    );
     return response.data.data;
 };
 
-/**
- * Get Result Indicators (RI) and Performance Indicators (PI) – Middle 80%
- * @param dateRange Optional start/end dates
- */
 export const getRIsAndPIs = async (dateRange?: DateRange): Promise<RIsAndPIs> => {
-    const response = await api.get<{ success: boolean; data: RIsAndPIs }>('/dashboard/ri-pi', {
-        params: withCacheBust(dateRange),
-    });
+    const response = await api.get<{ success: boolean; data: RIsAndPIs }>(
+        '/dashboard/ri-pi',
+        { params: dateRange },
+    );
     return response.data.data;
 };
 
-/**
- * Get Winning KPIs – Top 10% competitive advantage metrics
- * @param dateRange Optional start/end dates
- */
 export const getWinningKPIs = async (dateRange?: DateRange): Promise<WinningKPI[]> => {
-    const response = await api.get<{ success: boolean; data: WinningKPI[] }>('/dashboard/winning-kpis', {
-        params: withCacheBust(dateRange),
-    });
+    const response = await api.get<{ success: boolean; data: WinningKPI[] }>(
+        '/dashboard/winning-kpis',
+        { params: dateRange },
+    );
     return response.data.data;
 };
 
-/**
- * Get complete dashboard data in one request
- * @param dateRange Optional start/end dates
- */
-export const getCompleteDashboard = async (dateRange?: DateRange): Promise<CompleteDashboardData> => {
-    const response = await api.get<{ success: boolean; data: CompleteDashboardData }>('/dashboard/complete', {
-        params: withCacheBust(dateRange),
-    });
+// ─── Complete dashboard (single request, preferred) ──────────────────────────
+// FIX #6: Use this instead of 5 separate calls in the screen. The controller
+// already handles partial failures internally, so null-check each field.
+
+export const getCompleteDashboard = async (
+    dateRange?: DateRange,
+): Promise<CompleteDashboardData> => {
+    const response = await api.get<{ success: boolean; data: CompleteDashboardData }>(
+        '/dashboard/complete',
+        { params: dateRange },
+    );
     return response.data.data;
 };
