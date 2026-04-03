@@ -1,3 +1,0 @@
-npx expo install expo-camera
-app.json in plugins expo-router include expo camera
-npx expo prebuild

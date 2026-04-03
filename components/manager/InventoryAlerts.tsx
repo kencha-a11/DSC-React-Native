@@ -1,7 +1,7 @@
 // components/dashboard/InventoryAlerts.tsx
 import react, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import RestockProductModal from '../inventory/RestockProductModal';
+import RestockProductModal from '../inventory/modal/RestockProductModal';
 import { Ionicons } from '@expo/vector-icons';
 
 interface Product {
@@ -48,8 +48,8 @@ const InventoryAlerts: React.FC<InventoryAlertsProps> = ({ products, onRefresh }
                 : `Low stock: ${product.stock_quantity} remaining`}
             </Text>
           </View>
-          <TouchableOpacity 
-            style={styles.alertButton} 
+          <TouchableOpacity
+            style={styles.alertButton}
             onPress={() => {
               setSelectedProduct(product);
               setShowRestockProductModal(true);

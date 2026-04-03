@@ -16,7 +16,7 @@ import { useProducts } from "@/context/ProductContext";
 import { usePermissions } from "@/context/PermissionContext";
 import DscToast from "@/components/common/DscToast";
 import EditCategoryModal from "./EditCategoryModal";
-import RemoveCategoryModal from "@/components/inventory/RemoveCategoryModal";
+import RemoveCategoryModal from "@/components/inventory/modal/RemoveCategoryModal";
 import RemoveMultipleCategoryModal from "./RemoveMultipleCategoryModal";
 
 interface Props {
