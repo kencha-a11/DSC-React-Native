@@ -5,6 +5,7 @@ import FooterButton, {
 } from "@/components/layout/FooterButton";
 import Header from "@/components/layout/Header";
 import { useAccount } from "@/hooks/useAccount";
+import { useAuth } from "@/context/AuthContext";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -65,11 +66,16 @@ const DEFAULT_PERMISSIONS: Permissions = {
 
 export default function CreateSecondScreen() {
   const { data } = useLocalSearchParams<{ data: string }>();
+  const { user } = useAuth(); // Get current authenticated user
   const [accountData, setAccountData] = useState<AccountData | null>(null);
   const [permissions, setPermissions] = useState(DEFAULT_PERMISSIONS);
   const [toastVisible, setToastVisible] = useState(false);
 
   const { createAccount, loading, error } = useAccount();
+
+  // Determine if permissions should be shown
+  // Only cashier accounts require permission selection (regardless of who creates)
+  const shouldShowPermissions = accountData?.role === "cashier";
 
   // Parse incoming data
   useEffect(() => {
@@ -92,7 +98,10 @@ export default function CreateSecondScreen() {
   const handleSave = async () => {
     if (!accountData) return;
 
-    const success = await createAccount(accountData, permissions);
+    // For manager accounts, send default permissions (backend will ignore them)
+    const permissionsToSend = shouldShowPermissions ? permissions : DEFAULT_PERMISSIONS;
+
+    const success = await createAccount(accountData, permissionsToSend);
     if (success) {
       setToastVisible(true);
       setTimeout(() => {
@@ -156,31 +165,35 @@ export default function CreateSecondScreen() {
         {/* Error message */}
         {error && <Text style={styles.error}>{error}</Text>}
 
-        {/* Permission toggles */}
-        <View style={styles.permissions}>
-          {PERMISSIONS.map(({ key, label }) => (
-            <View key={key} style={styles.permissionRow}>
-              <Text style={styles.permissionLabel}>{label}</Text>
-              <Switch
-                trackColor={{ false: "#E6E6E6", true: "#ED277C" }}
-                thumbColor="#fff"
-                onValueChange={() => togglePermission(key)}
-                value={permissions[key]}
-              />
+        {/* Permissions section - only for cashier accounts */}
+        {shouldShowPermissions && (
+          <>
+            <View style={styles.permissions}>
+              {PERMISSIONS.map(({ key, label }) => (
+                <View key={key} style={styles.permissionRow}>
+                  <Text style={styles.permissionLabel}>{label}</Text>
+                  <Switch
+                    trackColor={{ false: "#E6E6E6", true: "#ED277C" }}
+                    thumbColor="#fff"
+                    onValueChange={() => togglePermission(key)}
+                    value={permissions[key]}
+                  />
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
 
-        {/* Summary */}
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryBoxText}>
-            {enabledCount} of {PERMISSIONS.length} permissions selected
-          </Text>
-        </View>
+            {/* Summary box */}
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryBoxText}>
+                {enabledCount} of {PERMISSIONS.length} permissions selected
+              </Text>
+            </View>
 
-        <Text style={styles.note}>
-          Permissions are optional. You can set them now or later.
-        </Text>
+            <Text style={styles.note}>
+              Permissions are optional. You can set them now or later.
+            </Text>
+          </>
+        )}
       </ScrollView>
 
       <FooterButton>

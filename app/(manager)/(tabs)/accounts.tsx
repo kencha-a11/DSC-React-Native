@@ -1,4 +1,3 @@
-// app/(manager)/(tabs)/accounts.tsx
 import {
   View,
   Text,
@@ -7,12 +6,15 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { useState, useCallback, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { accountService, AccountResponse } from "@/services/accountService";
 import Header from "@/components/layout/Header";
+import { useAuth } from "@/context/AuthContext";
 
 // Constants
 const ROLE_STYLES = {
@@ -86,6 +88,11 @@ export default function AccountsScreen() {
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "manager" | "cashier">("all");
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const { user } = useAuth();
+
+  const isSuperAdmin = user?.role?.toLowerCase().replace(/\s/g, "") === "superadmin";
 
   // Load accounts on focus
   useFocusEffect(
@@ -94,28 +101,48 @@ export default function AccountsScreen() {
       accountService
         .getAccounts()
         .then((response) => {
-          // response is { data: AccountResponse[], current_page, etc }
-          setAccounts(response.data); // ✅ Extract the array
+          let fetchedAccounts = response.data;
+          
+          if (user?.role?.toLowerCase() === "manager") {
+            fetchedAccounts = fetchedAccounts.filter(
+              (a) => a.role.toLowerCase() === "cashier" || a.id === user.id
+            );
+          } else if (isSuperAdmin) {
+            fetchedAccounts = fetchedAccounts.filter(
+              (a) => a.role.toLowerCase() === "manager" || a.role.toLowerCase() === "cashier" || a.id === user.id
+            );
+          }
+          
+          setAccounts(fetchedAccounts);
         })
         .catch(() => setAccounts([]))
         .finally(() => setLoading(false));
-    }, []),
+    }, [user?.role, user?.id, isSuperAdmin]),
   );
 
-  // Filter accounts by search query
-  const filteredAccounts = useMemo(() => {
-    if (!searchQuery.trim()) return accounts;
+  // Apply role filter (only for superadmin)
+  const filteredByRole = useMemo(() => {
+    if (!isSuperAdmin || roleFilter === "all") return accounts;
+    return accounts.filter((a) => {
+      // Always show the current user
+      if (a.id === user?.id) return true;
+      return a.role.toLowerCase() === roleFilter;
+    });
+  }, [accounts, roleFilter, isSuperAdmin, user?.id]);
 
+  // Filter by search query
+  const filteredAccounts = useMemo(() => {
+    if (!searchQuery.trim()) return filteredByRole;
     const q = searchQuery.toLowerCase();
-    return accounts.filter(
+    return filteredByRole.filter(
       (a) =>
         a.name.toLowerCase().includes(q) ||
         a.email.toLowerCase().includes(q) ||
-        a.role.toLowerCase().includes(q),
+        a.role.toLowerCase().includes(q)
     );
-  }, [accounts, searchQuery]);
+  }, [filteredByRole, searchQuery]);
 
-  // Group filtered accounts by first letter
+  // Group by first letter
   const sections = useMemo(() => {
     const grouped = filteredAccounts.reduce(
       (acc, account) => {
@@ -124,7 +151,7 @@ export default function AccountsScreen() {
         acc[letter].push(account);
         return acc;
       },
-      {} as Record<string, AccountResponse[]>,
+      {} as Record<string, AccountResponse[]>
     );
 
     return Object.keys(grouped)
@@ -148,11 +175,7 @@ export default function AccountsScreen() {
     });
   };
 
-  const renderSection = ({
-    item,
-  }: {
-    item: { letter: string; data: AccountResponse[] };
-  }) => (
+  const renderSection = ({ item }: { item: { letter: string; data: AccountResponse[] } }) => (
     <View>
       <SectionHeader letter={item.letter} />
       {item.data.map((account) => (
@@ -165,23 +188,18 @@ export default function AccountsScreen() {
     </View>
   );
 
+  const getFilterLabel = () => {
+    if (roleFilter === "all") return "All";
+    return capitalize(roleFilter);
+  };
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <Header 
-        title="Accounts"
-        showBackButton={false}
-      />
+      <Header title="Accounts" showBackButton={false} />
 
-
-      {/* Search */}
+      {/* Search Bar with Filter Button */}
       <View style={styles.searchContainer}>
-        <Ionicons
-          name="search"
-          size={16}
-          color="#999"
-          style={styles.searchIcon}
-        />
+        <Ionicons name="search" size={16} color="#999" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search accounts..."
@@ -194,9 +212,44 @@ export default function AccountsScreen() {
             <Ionicons name="close" size={18} color="#999" />
           </TouchableOpacity>
         )}
+        {isSuperAdmin && (
+          <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterButton}>
+            <Ionicons name="filter" size={20} color="#ED277C" />
+            {roleFilter !== "all" && <View style={styles.filterBadge} />}
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* List */}
+      {/* Filter Modal */}
+      <Modal
+        visible={filterModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setFilterModalVisible(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Filter by role</Text>
+            {(["all", "manager", "cashier"] as const).map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={styles.modalOption}
+                onPress={() => {
+                  setRoleFilter(option);
+                  setFilterModalVisible(false);
+                }}
+              >
+                <Text style={[styles.modalOptionText, roleFilter === option && styles.modalOptionActive]}>
+                  {option === "all" ? "All accounts" : capitalize(option)}
+                </Text>
+                {roleFilter === option && <Ionicons name="checkmark" size={20} color="#ED277C" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Account List */}
       {loading ? (
         <ActivityIndicator style={styles.loader} color="#ED277C" size="large" />
       ) : (
@@ -227,18 +280,6 @@ export default function AccountsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-  header: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 60,
-    marginBottom: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  headerTitle: { fontSize: 28, fontWeight: "bold", color: "#000" },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -252,6 +293,54 @@ const styles = StyleSheet.create({
   },
   searchIcon: { marginRight: 10 },
   searchInput: { flex: 1, fontSize: 16, color: "#000" },
+  filterButton: {
+    paddingHorizontal: 8,
+    position: "relative",
+  },
+  filterBadge: {
+    position: "absolute",
+    top: -2,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#ED277C",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 20,
+    width: "80%",
+    maxWidth: 300,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 16,
+    color: "#000",
+  },
+  modalOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  modalOptionActive: {
+    color: "#ED277C",
+    fontWeight: "500",
+  },
   loader: { marginTop: 40 },
   listContent: { paddingHorizontal: 20, paddingBottom: 100 },
   sectionHeader: {

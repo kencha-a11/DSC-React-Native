@@ -15,6 +15,7 @@ import FooterButton, {
   FooterButtonItem,
 } from "@/components/layout/FooterButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAuth } from "@/context/AuthContext"; // Import auth hook
 
 // Define types
 interface FormData {
@@ -23,18 +24,19 @@ interface FormData {
   email: string;
   phoneNumber: string;
   password: string;
-  pinCode?: string; // Added PIN field
+  pinCode?: string;
   status: string;
   role: string;
 }
 
 export default function CreateFirstScreen() {
+  const { user } = useAuth(); // Get current user
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
-  const [pinCode, setPinCode] = useState(""); // Added PIN state
+  const [pinCode, setPinCode] = useState("");
 
   // Dropdown values
   const [status, setStatus] = useState<string>("");
@@ -44,13 +46,27 @@ export default function CreateFirstScreen() {
   const [statusOpen, setStatusOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
 
-  // Dropdown options
+  // Status options (same for everyone)
   const statusOptions = ["Activated", "Deactivated"];
-  const roleOptions = ["cashier", "manager", "superadmin"]; // Fixed: added all roles
+
+  // Dynamic role options based on logged‑in user's role
+  const getRoleOptions = (): string[] => {
+    const userRole = user?.role?.toLowerCase().replace(/\s/g, "");
+    if (userRole === "superadmin") {
+      return ["cashier", "manager"]; // Superadmin can create cashier and manager
+    }
+    if (userRole === "manager") {
+      return ["cashier"]; // Manager can only create cashier
+    }
+    // If cashier or other (should not reach here), return empty array
+    return [];
+  };
+
+  const roleOptions = getRoleOptions();
 
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [pinError, setPinError] = useState(""); // Added PIN error state
+  const [pinError, setPinError] = useState("");
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -73,7 +89,7 @@ export default function CreateFirstScreen() {
     setEmailError(
       text.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)
         ? "Please enter a valid email address"
-        : "",
+        : ""
     );
   };
 
@@ -82,15 +98,13 @@ export default function CreateFirstScreen() {
     setPasswordError(
       text.length > 0 && !/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(text)
         ? "Password must be at least 6 characters with letters and numbers"
-        : "",
+        : ""
     );
   };
 
   const validatePin = (text: string) => {
-    // Only allow numbers
     const numericText = text.replace(/[^0-9]/g, "");
     setPinCode(numericText);
-
     if (numericText.length > 0 && numericText.length !== 6) {
       setPinError("PIN must be exactly 6 digits");
     } else {
@@ -98,7 +112,7 @@ export default function CreateFirstScreen() {
     }
   };
 
-  // Derived value for form validation
+  // Form validation includes that a role must be selected from the allowed list
   const isFormComplete =
     !!(
       firstName.trim() &&
@@ -111,7 +125,7 @@ export default function CreateFirstScreen() {
     ) &&
     !emailError &&
     !passwordError &&
-    (pinCode.length === 0 || !pinError); // PIN is optional
+    (pinCode.length === 0 || !pinError);
 
   const handleNext = () => {
     const accountData: FormData = {
@@ -120,7 +134,7 @@ export default function CreateFirstScreen() {
       email,
       phoneNumber,
       password,
-      pinCode: pinCode || undefined, // Only include if provided
+      pinCode: pinCode || undefined,
       status: status || "",
       role: role || "",
     };
@@ -154,6 +168,27 @@ export default function CreateFirstScreen() {
     setRole(option);
     setRoleOpen(false);
   };
+
+  // If the user has no permission to create any account (e.g., cashier), show a message
+  if (roleOptions.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Header title="create account" onBackPress={() => router.back()} />
+        <View style={styles.noPermissionContainer}>
+          <Ionicons name="lock-closed" size={60} color="#ccc" />
+          <Text style={styles.noPermissionText}>
+            You don't have permission to create new accounts.
+          </Text>
+          <TouchableOpacity
+            style={styles.goBackButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.goBackButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -250,7 +285,7 @@ export default function CreateFirstScreen() {
           ) : null}
         </View>
 
-        {/* PIN Code - NEW */}
+        {/* PIN Code */}
         <View style={styles.inputWrapper}>
           <Text style={styles.label}>PIN Code (optional - 6 digits)</Text>
           <TextInput
@@ -319,7 +354,7 @@ export default function CreateFirstScreen() {
           )}
         </View>
 
-        {/* Role dropdown */}
+        {/* Role dropdown - only shows allowed roles */}
         <View
           style={[
             styles.dropdownWrapper,
@@ -492,5 +527,29 @@ const styles = StyleSheet.create({
   dropdownOptionText: {
     fontSize: 16,
     color: "#333",
+  },
+  noPermissionContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  noPermissionText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  goBackButton: {
+    backgroundColor: "#ED277C",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  goBackButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

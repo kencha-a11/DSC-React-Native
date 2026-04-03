@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { StyleSheet, ScrollView, RefreshControl, View } from 'react-native';
 import {
   StatsGrid,
   SalesTrendChart,
@@ -9,19 +9,22 @@ import {
   InventoryAlerts,
   LoadingScreen,
   ErrorScreen,
-} from '@/components/dashboard';
-import Header from "@/components/layout/Header";
+} from '@/components/manager';
+import Header from '@/components/layout/Header';
+// FIX #3: Correct import path — file lives at services/api/dashboard.ts
 import {
-  getDashboardStats,
-  getDailySalesTrend,
-  getCategoryPerformance,
-  getTopProducts,
-  getRecentTransactions,
+  getCompleteDashboard,
+  DashboardStats,
+  DailySalesItem,
+  TopProduct,
+  CategoryPerformanceItem,
+  RecentTransaction,
 } from '@/services/dashboard';
 import { useProducts } from '@/context/ProductContext';
 
-// Types (same as before)
-interface DashboardStats {
+// ─── Local state types (camelCase for component use) ─────────────────────────
+
+interface Stats {
   totalSales: number;
   totalRevenue: number;
   totalProducts: number;
@@ -32,127 +35,90 @@ interface DashboardStats {
   avgTransactionValue: number;
 }
 
-interface DailySales {
-  date: string;
-  amount: number;
-  transactions: number;
+const DEFAULT_STATS: Stats = {
+  totalSales: 0,
+  totalRevenue: 0,
+  totalProducts: 0,
+  totalUsers: 0,
+  lowStockItems: 0,
+  outOfStockItems: 0,
+  activeUsers: 0,
+  avgTransactionValue: 0,
+};
+
+// ─── Mapper: API snake_case → component camelCase ────────────────────────────
+
+function mapStats(raw: DashboardStats): Stats {
+  return {
+    totalSales: raw.total_sales,
+    totalRevenue: raw.total_revenue,
+    totalProducts: raw.total_products,
+    totalUsers: raw.total_users,
+    lowStockItems: raw.low_stock_items,
+    outOfStockItems: raw.out_of_stock_items,
+    activeUsers: raw.active_users,
+    avgTransactionValue: raw.avg_transaction_value,
+  };
 }
 
-interface TopProduct {
-  id: number;
-  name: string;
-  quantity_sold: number;
-  revenue: number;
-  category: string;
-}
-
-interface CategoryPerformance {
-  category: string;
-  revenue: number;
-  items_sold: number;
-}
-
-interface RecentTransaction {
-  id: number;
-  user_id: number;
-  total_amount: number;
-  created_at: string;
-  user_name: string;
-}
+// ─── Component ───────────────────────────────────────────────────────────────
 
 const DashboardScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // State for dashboard data
-  const [stats, setStats] = useState<DashboardStats>({
-    totalSales: 0,
-    totalRevenue: 0,
-    totalProducts: 0,
-    totalUsers: 0,
-    lowStockItems: 0,
-    outOfStockItems: 0,
-    activeUsers: 0,
-    avgTransactionValue: 0,
-  });
-  const [dailySales, setDailySales] = useState<DailySales[]>([]);
+  const [stats, setStats] = useState<Stats>(DEFAULT_STATS);
+  const [dailySales, setDailySales] = useState<DailySalesItem[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [categoryPerformance, setCategoryPerformance] = useState<CategoryPerformance[]>([]);
+  const [categoryPerformance, setCategoryPerformance] = useState<CategoryPerformanceItem[]>([]);
   const [recentSales, setRecentSales] = useState<RecentTransaction[]>([]);
 
-  // Access product context to listen for changes
-  const { products, refreshProducts } = useProducts();
+  // Inventory alerts come from the product context (stays up-to-date with local ops)
+  const { products } = useProducts();
+  const inventoryAlerts = React.useMemo(
+    () => products.filter((p: any) => p.status === 'low stock' || p.status === 'out of stock'),
+    [products],
+  );
 
-  // Compute inventory alerts locally from the fresh products list
-  const inventoryAlerts = React.useMemo(() => {
-    const alerts = products.filter(p => p.status === 'low stock' || p.status === 'out of stock');
-    console.log('Dashboard: inventoryAlerts recomputed', alerts.length);
-    return alerts;
-  }, [products]);
-
-  // Ref to store the previous quantity fingerprint
-  const prevQuantityFingerprint = useRef<string>('');
-  // Ref to prevent multiple concurrent data fetches
+  // Guards against concurrent fetches and stale fingerprint refreshes
   const isFetchingRef = useRef(false);
-  // Ref for debouncing auto-refresh after product quantity changes
+  const prevFingerprintRef = useRef('');
   const autoRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Helper: compute a unique fingerprint of product IDs and stock quantities
-  const getQuantityFingerprint = (products: any[]) => {
-    const fingerprint = products
+  // ── fingerprint helper ───────────────────────────────────────────────────
+  const getFingerprint = (list: any[]) =>
+    list
       .slice()
       .sort((a, b) => a.id - b.id)
       .map(p => `${p.id}:${p.stock_quantity}`)
       .join('|');
-    console.log('Dashboard: fingerprint generated', fingerprint.slice(0, 100));
-    return fingerprint;
-  };
 
+  // ── main fetch ───────────────────────────────────────────────────────────
+  // FIX #6: Single /dashboard/complete call instead of 5 parallel calls.
+  // The controller wraps each sub-call in try/catch, so a single section
+  // failing will return null for that key rather than a 500 for everything.
   const fetchDashboardData = useCallback(async (showLoading = true) => {
     if (isFetchingRef.current) {
-      console.log('Dashboard: fetch already in progress, skipping');
       setRefreshing(false);
       return;
     }
     isFetchingRef.current = true;
     if (showLoading) setLoading(true);
-    console.log('Dashboard: fetching data...');
 
     try {
-      const [
-        statsData,
-        dailySalesData,
-        categoryData,
-        topProductsData,
-        recentTransactionsData,
-      ] = await Promise.all([
-        getDashboardStats(),
-        getDailySalesTrend(7),
-        getCategoryPerformance(),
-        getTopProducts(5),
-        getRecentTransactions(5),
-      ]);
+      const data = await getCompleteDashboard();
 
-      setStats({
-        totalSales: statsData.total_sales,
-        totalRevenue: statsData.total_revenue,
-        totalProducts: statsData.total_products,
-        totalUsers: statsData.total_users,
-        lowStockItems: statsData.low_stock_items,
-        outOfStockItems: statsData.out_of_stock_items,
-        activeUsers: statsData.active_users,
-        avgTransactionValue: statsData.avg_transaction_value,
-      });
-      setDailySales(dailySalesData);
-      setCategoryPerformance(categoryData);
-      setTopProducts(topProductsData);
-      setRecentSales(recentTransactionsData);
+      // Each field may be null if the controller sub-call failed
+      if (data.stats) setStats(mapStats(data.stats));
+      if (data.daily_sales) setDailySales(data.daily_sales);
+      if (data.category_performance) setCategoryPerformance(data.category_performance);
+      if (data.top_products) setTopProducts(data.top_products);
+      if (data.recent_transactions) setRecentSales(data.recent_transactions);
 
       setError(null);
-      console.log('Dashboard: data fetched successfully');
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
+      console.error('Dashboard fetch error:', err);
       setError('Failed to load dashboard data. Please check your connection and try again.');
     } finally {
       setLoading(false);
@@ -161,48 +127,42 @@ const DashboardScreen: React.FC = () => {
     }
   }, []);
 
-  // Manual refresh (pull-to-refresh)
-  const onRefresh = async () => {
-    console.log('Dashboard: manual refresh triggered');
+  // ── pull-to-refresh ──────────────────────────────────────────────────────
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchDashboardData(true);
-  };
+  }, [fetchDashboardData]);
 
-  // Auto-refresh ONLY when product quantities change
+  // ── auto-refresh when product stock changes ──────────────────────────────
   useEffect(() => {
-    console.log('Dashboard: products changed, length:', products.length);
     if (products.length === 0) {
-      prevQuantityFingerprint.current = getQuantityFingerprint(products);
-      console.log('Dashboard: initial fingerprint set (empty)');
+      prevFingerprintRef.current = getFingerprint(products);
       return;
     }
 
-    const currentFingerprint = getQuantityFingerprint(products);
-    console.log('Dashboard: prev fingerprint:', prevQuantityFingerprint.current.slice(0, 100));
-    console.log('Dashboard: current fingerprint:', currentFingerprint.slice(0, 100));
-    if (prevQuantityFingerprint.current && prevQuantityFingerprint.current !== currentFingerprint) {
-      console.log('Dashboard: fingerprint changed, scheduling refresh');
+    const current = getFingerprint(products);
+
+    if (prevFingerprintRef.current && prevFingerprintRef.current !== current) {
       if (autoRefreshTimeoutRef.current) clearTimeout(autoRefreshTimeoutRef.current);
       autoRefreshTimeoutRef.current = setTimeout(() => {
-        if (!loading && !refreshing) {
-          console.log('Dashboard: executing background refresh after fingerprint change');
-          fetchDashboardData(false);
-        } else {
-          console.log('Dashboard: refresh skipped, loading or refreshing is true');
-        }
+        if (!loading && !refreshing) fetchDashboardData(false);
       }, 500);
-    } else {
-      console.log('Dashboard: fingerprint unchanged, no refresh');
     }
-    prevQuantityFingerprint.current = currentFingerprint;
+
+    prevFingerprintRef.current = current;
+
+    // FIX #7: Cleanup timeout on unmount to prevent state updates after unmount
+    return () => {
+      if (autoRefreshTimeoutRef.current) clearTimeout(autoRefreshTimeoutRef.current);
+    };
   }, [products, fetchDashboardData, loading, refreshing]);
 
-  // Initial load
+  // ── initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
-    console.log('Dashboard: initial load');
     fetchDashboardData(true);
   }, [fetchDashboardData]);
 
+  // ── render ───────────────────────────────────────────────────────────────
   if (loading && !refreshing) return <LoadingScreen />;
   if (error) return <ErrorScreen error={error} onRetry={onRefresh} />;
 
@@ -213,7 +173,11 @@ const DashboardScreen: React.FC = () => {
         style={styles.container}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3B82F6']} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3B82F6']}
+          />
         }
       >
         <View style={styles.content}>
