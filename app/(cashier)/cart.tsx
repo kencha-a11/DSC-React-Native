@@ -14,10 +14,10 @@ import { useFocusEffect, router } from "expo-router";
 
 import AddItemBox from "@/components/cart/AddItemBox";
 import CartItem from "@/components/cart/CartItem";
-import ClearCartModal from "@/components/modal/ClearCartModal";
-import ExitCartModal from "@/components/modal/ExitCartModal";
-import ProductModal from "@/components/modal/ProductModal";
-import CartSummaryModal from "@/components/modal/CartSummaryModal";
+import ClearCartModal from "@/components/cart/ClearCartModal";
+import ExitCartModal from "@/components/cart/ExitCartModal";
+import ProductModal from "@/components/product/ProductModal";
+import CartSummaryModal from "@/components/cart/CartSummaryModal";
 import Header from "@/components/layout/Header";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductContext";
@@ -192,7 +192,7 @@ export default function CartScreen() {
           <View style={styles.emptyAddItemBox}>
             <AddItemBox
               onAddItem={goToAddItem}
-              onSearch={() => {}}
+              onSearch={() => { }}
               onBarcodeScan={goToScan}
             />
           </View>
@@ -225,7 +225,7 @@ export default function CartScreen() {
           <View style={styles.addItemBoxWrapper}>
             <AddItemBox
               onAddItem={goToAddItem}
-              onSearch={() => {}}
+              onSearch={() => { }}
               onBarcodeScan={goToScan}
             />
           </View>

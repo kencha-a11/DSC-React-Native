@@ -1,7 +1,7 @@
 import Search from "@/components/common/Search";
 import CategorySlider from "@/components/product/CategorySlider";
 import ProductCard from "@/components/product/ProductCard";
-import ProductModal from "@/components/modal/ProductModal";
+import ProductModal from "@/components/product/ProductModal";
 import Header from "@/components/layout/Header";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductContext";
@@ -20,7 +20,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 export default function ProductScreen() {
   const { addItem, itemCount, hasItems, cartItems } = useCart();
-  const { products, loading, fetchProducts, refreshProducts} = useProducts();
+  const { products, loading, fetchProducts, refreshProducts } = useProducts();
   const { categories } = useCategories();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -187,7 +187,7 @@ export default function ProductScreen() {
           />
         </View>
       </View>
-      
+
       <CategorySlider
         onCategoryChange={(id, name) => setSelectedCategory({ id, name })}
         selectedCategoryId={selectedCategory.id}

@@ -14,14 +14,14 @@ import {
 
 import DscToast from "@/components/common/DscToast";
 import Search from "@/components/common/Search";
-import AddCategoryModal from "@/components/inventory/AddCategoryModal";
-import AddProductModal from "@/components/inventory/AddProductModal";
-import CategoryManagementModal from "@/components/inventory/CategoryManagementModal";
+import AddCategoryModal from "@/components/inventory/modal/AddCategoryModal";
+import AddProductModal from "@/components/inventory/modal/AddProductModal";
+import CategoryManagementModal from "@/components/inventory/modal/CategoryManagementModal";
 import FilterChip from "@/components/inventory/components/FilterChip";
-import DeductProductModal from "@/components/inventory/DeductProductModal";
-import EditProductModal from "@/components/inventory/EditProductModal";
-import RemoveProductModal from "@/components/inventory/RemoveProductModal";
-import RestockProductModal from "@/components/inventory/RestockProductModal";
+import DeductProductModal from "@/components/inventory/modal/DeductProductModal";
+import EditProductModal from "@/components/inventory/modal/EditProductModal";
+import RemoveProductModal from "@/components/inventory/modal/RemoveProductModal";
+import RestockProductModal from "@/components/inventory/modal/RestockProductModal";
 import Header from "@/components/layout/Header";
 
 import {

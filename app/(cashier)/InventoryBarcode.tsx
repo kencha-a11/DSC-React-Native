@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useProducts } from "@/context/ProductContext";
 import DscToast from "@/components/common/DscToast";
 import Header from "@/components/layout/Header";
-import EditProductBarcodeModal from "@/components/inventory/EditProductBarcodeModal";
+import EditProductBarcodeModal from "@/components/inventory/modal/EditProductBarcodeModal";
 import { router } from "expo-router";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");

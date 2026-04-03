@@ -1,6 +1,6 @@
 import DscToast from "@/components/common/DscToast";
 import Header from "@/components/layout/Header";
-import ProductModal from "@/components/modal/ProductModal";
+import ProductModal from "@/components/product/ProductModal";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductContext";
 import { Ionicons } from "@expo/vector-icons";
