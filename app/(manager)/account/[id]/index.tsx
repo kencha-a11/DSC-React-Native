@@ -1,6 +1,9 @@
 // app/(manager)/account/[id]/index.tsx
 import DscToast from "@/components/common/DscToast";
 import Header from "@/components/layout/Header";
+import InventoryLog from "@/components/records/InventoryLog";
+import SaleLog from "@/components/records/SaleLog";
+import TimeLog from "@/components/records/TimeLog";
 import { accountService } from "@/services/accountService";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -11,11 +14,27 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Modal,
 } from "react-native";
 
 const capitalize = (s: string) => {
   if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+};
+
+// ✅ Add date formatter helper
+const formatDate = (dateString?: string) => {
+  if (!dateString) return "Unknown";
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch (error) {
+    return "Unknown";
+  }
 };
 
 // Role badge styles
@@ -25,6 +44,8 @@ const ROLE_STYLES = {
   cashier: { bg: "#E3F2FD", color: "#1976D2" },
   default: { bg: "#f0f0f0", color: "#666" },
 };
+
+type LogViewType = 'sales' | 'inventory' | 'time';
 
 export default function AccountProfileScreen() {
   const params = useLocalSearchParams<{
@@ -46,6 +67,8 @@ export default function AccountProfileScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
+  const [logModalVisible, setLogModalVisible] = useState(false);
+  const [logViewType, setLogViewType] = useState<LogViewType>('sales');
 
   // Initialize with params data immediately
   const [account, setAccount] = useState({
@@ -83,7 +106,6 @@ export default function AccountProfileScreen() {
 
       const accountId = Number(params.id);
 
-      // Refresh in background
       setLoading(true);
 
       accountService
@@ -104,7 +126,7 @@ export default function AccountProfileScreen() {
             phoneNumber: data.phone_number || account.phoneNumber,
             role: data.role || account.role,
             status: data.account_status || account.status,
-            joinDate: account.joinDate,
+            joinDate: data.created_at || account.joinDate, // ✅ Use created_at from API
           });
           setError(null);
         })
@@ -116,7 +138,6 @@ export default function AccountProfileScreen() {
     }, [params.id]),
   );
 
-  // Safe string operations
   const safeRole = account?.role?.toLowerCase?.() || "default";
   const roleStyle =
     ROLE_STYLES[safeRole as keyof typeof ROLE_STYLES] || ROLE_STYLES.default;
@@ -161,6 +182,15 @@ export default function AccountProfileScreen() {
     });
   };
 
+  const openLogView = (type: LogViewType) => {
+    if (!account.id || account.id === 0) {
+      showToast("Account ID not found", "error");
+      return;
+    }
+    setLogViewType(type);
+    setLogModalVisible(true);
+  };
+
   if (error && !account.id) {
     return (
       <View style={styles.container}>
@@ -173,7 +203,7 @@ export default function AccountProfileScreen() {
             onPress={() => {
               setError(null);
               setLoading(true);
-              accountService
+              accountService  
                 .getAccount(Number(params.id))
                 .then((data) => {
                   if (data) {
@@ -187,7 +217,7 @@ export default function AccountProfileScreen() {
                       phoneNumber: data.phone_number,
                       role: data.role,
                       status: data.account_status,
-                      joinDate: account.joinDate,
+                      joinDate: data.created_at || account.joinDate,
                     });
                   }
                 })
@@ -206,7 +236,6 @@ export default function AccountProfileScreen() {
     <View style={styles.container}>
       <Header title="Profile Account" onBackPress={() => router.back()} />
 
-      {/* Toast notification */}
       <DscToast
         visible={toastVisible}
         message={toastMessage}
@@ -244,11 +273,7 @@ export default function AccountProfileScreen() {
               value: capitalize(account.status) || "Unknown",
               badge: true,
             },
-            { label: "Member Since", value: account.joinDate },
-            {
-              label: "Account ID",
-              value: account.id && account.id > 0 ? `#${account.id}` : "N/A",
-            },
+            { label: "Member Since", value: formatDate(account.joinDate) }, // ✅ Format the date
           ].map(({ label, value, badge }) => (
             <View key={label} style={styles.infoRow}>
               <Text style={styles.infoLabel}>{label}</Text>
@@ -283,41 +308,63 @@ export default function AccountProfileScreen() {
             <Text style={styles.permissionsButtonText}>Permissions</Text>
           </TouchableOpacity>
 
-          {[
-            {
-              label: "View sales log",
-              icon: "document-text",
-              onPress: () => showToast("Sales log coming soon", "success"),
-            },
-            {
-              label: "View inventory log",
-              icon: "cube",
-              onPress: () => showToast("Inventory log coming soon", "success"),
-            },
-          ].map(({ label, icon, onPress }) => (
-            <TouchableOpacity
-              key={label}
-              style={styles.logButton}
-              onPress={onPress}
-            >
-              <Ionicons name={icon as any} size={20} color="#ED277C" />
-              <Text style={styles.logButtonText}>{label}</Text>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color="#999"
-                style={styles.chevron}
-              />
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity
+            style={styles.logButton}
+            onPress={() => openLogView('sales')}
+          >
+            <Ionicons name="document-text" size={20} color="#ED277C" />
+            <Text style={styles.logButtonText}>View sales log</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" style={styles.chevron} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.logButton}
+            onPress={() => openLogView('inventory')}
+          >
+            <Ionicons name="cube" size={20} color="#ED277C" />
+            <Text style={styles.logButtonText}>View inventory log</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" style={styles.chevron} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.logButton}
+            onPress={() => openLogView('time')}
+          >
+            <Ionicons name="time" size={20} color="#ED277C" />
+            <Text style={styles.logButtonText}>View time logs</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" style={styles.chevron} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Log Viewer Modal */}
+      <Modal
+        visible={logModalVisible}
+        animationType="slide"
+        onRequestClose={() => setLogModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "#fff" }}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setLogModalVisible(false)}>
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {logViewType === 'sales' ? 'Sales Logs' :
+                logViewType === 'inventory' ? 'Inventory Logs' : 'Time Logs'}
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+          {logViewType === 'sales' && <SaleLog userId={account.id} />}
+          {logViewType === 'inventory' && <InventoryLog userId={account.id} />}
+          {logViewType === 'time' && <TimeLog userId={account.id} />}
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#fff", paddingBottom: 40 },
   content: { padding: 20 },
   errorContainer: {
     flex: 1,
@@ -349,8 +396,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontStyle: "italic",
   },
-
-  // Profile header
   profileHeader: { alignItems: "center", marginBottom: 30 },
   avatar: {
     width: 100,
@@ -365,8 +410,6 @@ const styles = StyleSheet.create({
   name: { fontSize: 24, fontWeight: "bold", color: "#000", marginBottom: 8 },
   roleBadge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
   roleBadgeText: { fontSize: 14, fontWeight: "600" },
-
-  // Info section
   section: {
     backgroundColor: "#f9f9f9",
     padding: 16,
@@ -395,8 +438,6 @@ const styles = StyleSheet.create({
     flex: 2,
     textAlign: "right",
   },
-
-  // Status badge
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -407,8 +448,6 @@ const styles = StyleSheet.create({
   },
   activeStatus: { backgroundColor: "#E8F5E9", color: "#34C759" },
   inactiveStatus: { backgroundColor: "#FFE5E5", color: "#FF3B30" },
-
-  // Actions
   actions: { gap: 12 },
   editButton: {
     backgroundColor: "#ED277C",
@@ -449,4 +488,19 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   chevron: { marginLeft: "auto" },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    backgroundColor: "#fff",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#ED277C",
+  },
 });

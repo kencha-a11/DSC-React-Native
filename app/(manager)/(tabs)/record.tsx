@@ -5,6 +5,8 @@ import Header from "@/components/layout/Header";
 import SaleLog from "@/components/records/SaleLog";
 import InventoryLog from "@/components/records/InventoryLog";
 
+import SalesSummaryModal from "@/components/test/modal/SalesSummaryModal"
+
 export default function RecordScreen() {
     const insets = useSafeAreaInsets();
     const [activeTab, setActiveTab] = useState<"sales" | "inventory">("sales");

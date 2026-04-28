@@ -312,10 +312,6 @@ export default function EditAccountScreen() {
         onScroll={() => setOpenDropdown(null)}
         scrollEventThrottle={16}
       >
-        <View style={styles.idBadge}>
-          <Text style={styles.idLabel}>Account ID</Text>
-          <Text style={styles.idValue}>#{accountId}</Text>
-        </View>
 
         {/* Unsaved changes indicator */}
         {hasChanges && (
@@ -488,7 +484,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
-  inputWrapper: { marginBottom: 20 },
+  inputWrapper: { marginVertical: 20 },
   label: { fontSize: 16, color: "#666", marginBottom: 8, fontWeight: "500" },
   input: {
     height: 55,

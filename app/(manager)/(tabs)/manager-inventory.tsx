@@ -386,11 +386,11 @@ export default function ManagerInventoryScreen() {
         </View>
       )}
 
-      {/* Quick actions – all are shown for managers */}
+      {/* Quick action bar - Manage Categories and New Category */}
       <View style={styles.quickActionBar}>
-        <TouchableOpacity style={styles.quickAction} onPress={() => openModal("addProduct")}>
-          <Ionicons name="add-circle" size={20} color="#ED277C" />
-          <Text style={styles.quickActionText}>Add Product</Text>
+        <TouchableOpacity style={styles.quickAction} onPress={() => openModal("manageCategories")}>
+          <Ionicons name="settings-outline" size={20} color="#ED277C" />
+          <Text style={styles.quickActionText}>Manage Categories</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.quickAction} onPress={() => openModal("addCategory")}>
           <Ionicons name="folder-open" size={20} color="#ED277C" />
@@ -439,10 +439,10 @@ export default function ManagerInventoryScreen() {
         />
       )}
 
-      {/* Manage categories – always shown for managers */}
-      <TouchableOpacity style={styles.manageCategoriesButton} onPress={() => openModal("manageCategories")}>
-        <Ionicons name="settings-outline" size={20} color="#fff" />
-        <Text style={styles.manageCategoriesText}>Manage Categories</Text>
+      {/* Add Product button - moved to bottom floating button */}
+      <TouchableOpacity style={styles.manageCategoriesButton} onPress={() => openModal("addProduct")}>
+        <Ionicons name="add-circle" size={20} color="#fff" />
+        <Text style={styles.manageCategoriesText}>Add Product</Text>
       </TouchableOpacity>
     </View>
   );

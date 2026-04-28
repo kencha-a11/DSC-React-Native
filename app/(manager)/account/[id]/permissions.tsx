@@ -274,17 +274,6 @@ export default function PermissionAccountScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Account card */}
-        <View style={styles.headerCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{accountName.charAt(0)}</Text>
-          </View>
-          <View>
-            <Text style={styles.accountName}>{accountName}</Text>
-            <Text style={styles.accountId}>Account ID: #{userId}</Text>
-          </View>
-        </View>
-
         {/* Quick actions */}
         <View style={styles.quickActions}>
           {[
