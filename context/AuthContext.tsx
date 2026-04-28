@@ -1,5 +1,3 @@
-// src/context/AuthContext.tsx
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import {
   checkPin as apiCheckPin,
@@ -12,6 +10,7 @@ import {
 import * as SecureStore from "expo-secure-store";
 import IntroductionProgress from "@/components/common/IntroductionProgress";
 import { useToggle } from "@/hooks/useToggle";
+import { cancelAllRequests, CanceledError } from "@/api/axios";
 
 // ------------------------------
 // Types
@@ -130,6 +129,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token: response.token,
       };
     } catch (err: any) {
+      // Don't show error for cancelled requests
+      if (err instanceof CanceledError || err.code === 'ERR_CANCELED') {
+        throw new Error("Operation cancelled");
+      }
       setError(err.message || "PIN verification failed");
       throw err;
     } finally {
@@ -160,6 +163,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPendingUserId(null);
       setAuthProgress(100);
     } catch (err: any) {
+      // Don't show error for cancelled requests
+      if (err instanceof CanceledError || err.code === 'ERR_CANCELED') {
+        throw new Error("Operation cancelled");
+      }
       setError(err.message || "Wrong Password");
       throw err;
     } finally {
@@ -177,14 +184,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     
+    // Cancel all ongoing API operations
+    console.log("Logging out - cancelling all pending requests");
+    cancelAllRequests();
+    
     // Cancel overlay processes
     setShowAuthOverlay(false);
     setAuthProgress(0);
     
     try {
       await apiLogout();
-    } catch {
-      // ignore
+    } catch (err: any) {
+      // Ignore cancellation errors, they are expected
+      if (!(err instanceof CanceledError) && err.code !== 'ERR_CANCELED') {
+        console.warn("Logout API error:", err);
+      }
     } finally {
       setUser(null);
       setTimeLog(null);

@@ -1,10 +1,10 @@
 # ============================================
 # COMPLETE CLEAN BUILD SCRIPT FOR EXPO ANDROID
 # ============================================
-# RUN THIS FROM: C:\projects\mobile
+# RUN THIS FROM: C:\projects\DSC_FULL_TECH_STACK\mobile
 # ============================================
 
-Write-Host "📂 Current directory should be: C:\projects\mobile" -ForegroundColor Yellow
+Write-Host "📂 Current directory should be: C:\projects\DSC_FULL_TECH_STACK\mobile" -ForegroundColor Yellow
 Write-Host "🛑 Killing Java and Node processes..." -ForegroundColor Cyan
 taskkill /F /IM java.exe 2>$null
 taskkill /F /IM node.exe 2>$null
@@ -23,9 +23,15 @@ if (Test-Path $npmCache) {
 }
 npm cache verify --silent
 
-# Install dependencies
+# Install dependencies with legacy-peer-deps
 Write-Host "📦 Installing dependencies from package.json..." -ForegroundColor Cyan
 npm install --legacy-peer-deps
+
+# Automatically fix Expo-specific version mismatches
+Write-Host "🛠 Checking and fixing Expo compatibility..." -ForegroundColor Yellow
+npx expo install --fix
+
+Write-Host "✅ Installation and sync complete!" -ForegroundColor Green
 
 # ✅ Force non‑interactive mode for all Expo commands
 $env:CI = "true"
@@ -76,4 +82,4 @@ Write-Host "📂 Opening APK folder..." -ForegroundColor Green
 explorer android\app\build\outputs\apk\release\
 
 Write-Host "✅ Build complete! APK location:" -ForegroundColor Green
-Write-Host "C:\projects\mobile\android\app\build\outputs\apk\release\app-release.apk" -ForegroundColor Yellow
+Write-Host "C:\projects\DSC_FULL_TECH_STACK\mobile\android\app\build\outputs\apk\release\app-release.apk" -ForegroundColor Yellow

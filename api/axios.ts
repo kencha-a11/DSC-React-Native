@@ -1,7 +1,6 @@
-// services/api/axios.ts
 import { getApiUrl } from '@/utils/getApiURL';
 import { normalizeToUTC } from '@/utils/normalizeToUTC';
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, CanceledError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,12 +15,6 @@ const log = {
     warn: (...args: any[]) => {},
     error: (...args: any[]) => {},
 };
-// const log = {
-//     debug: (...args: any[]) => __DEV__ && console.log('🔧 [API]', ...args),
-//     info: (...args: any[]) => __DEV__ && console.log('🔧 [API] ℹ️', ...args),
-//     warn: (...args: any[]) => __DEV__ && console.warn('🔧 [API] ⚠️', ...args),
-//     error: (...args: any[]) => console.error('🔧 [API] ❌', ...args),
-// };
 
 // ------------------------------
 // Debounce helper for storage
@@ -41,6 +34,38 @@ enum RequestPriority {
     HIGH = 0,
     MEDIUM = 1,
     LOW = 2,
+}
+
+// ------------------------------
+// Request cancellation registry
+// ------------------------------
+const pendingRequests = new Map<string, AbortController>();
+
+function generateRequestId(config: AxiosRequestConfig): string {
+    return `${config.method?.toUpperCase()}:${config.url}?${JSON.stringify(config.params)}`;
+}
+
+function addPendingRequest(config: AxiosRequestConfig, controller: AbortController): void {
+    const id = generateRequestId(config);
+    pendingRequests.set(id, controller);
+}
+
+function removePendingRequest(config: AxiosRequestConfig): void {
+    const id = generateRequestId(config);
+    pendingRequests.delete(id);
+}
+
+export function cancelAllRequests(): void {
+    log.debug(`Cancelling ${pendingRequests.size} pending requests`);
+    pendingRequests.forEach((controller, id) => {
+        try {
+            controller.abort();
+            log.debug(`Cancelled request: ${id}`);
+        } catch (e) {
+            // ignore abort errors
+        }
+    });
+    pendingRequests.clear();
 }
 
 // ------------------------------
@@ -83,6 +108,10 @@ const retryWithBackoff = async <T>(fn: () => Promise<T>, maxRetries = 3): Promis
         try {
             return await fn();
         } catch (error: any) {
+            // Don't retry cancelled requests
+            if (error instanceof CanceledError || error.code === 'ERR_CANCELED') {
+                throw error;
+            }
             if (i === maxRetries - 1) throw error;
             if (![502, 503, 504].includes(error.response?.status)) throw error;
 
@@ -292,6 +321,14 @@ const deduplicateRequest = async <T>(
 
     const promise = priorityQueue.add(priority, requestFn);
     cache.setPending(key, promise);
+    
+    // Clean up pending cache if request fails (but not for cancellation)
+    promise.catch((error) => {
+        if (!(error instanceof CanceledError) && error.code !== 'ERR_CANCELED') {
+            cache.setPending(key, null as any);
+        }
+    });
+    
     return promise;
 };
 
@@ -360,6 +397,11 @@ export const initializeApi = async (): Promise<AxiosInstance> => {
                     normalizeToUTC(config.data);
                 }
 
+                // Create AbortController for this request
+                const controller = new AbortController();
+                config.signal = controller.signal;
+                addPendingRequest(config, controller);
+
                 return config;
             },
             (error) => {
@@ -371,6 +413,9 @@ export const initializeApi = async (): Promise<AxiosInstance> => {
         // Response Interceptor
         apiInstance.interceptors.response.use(
             (response) => {
+                // Clean up pending request registry
+                removePendingRequest(response.config);
+                
                 if (response.config.method?.toLowerCase() === 'get') {
                     const cacheKey = `${response.config.url}-${JSON.stringify(response.config.params)}`;
                     const etag = response.headers.etag;
@@ -379,6 +424,17 @@ export const initializeApi = async (): Promise<AxiosInstance> => {
                 return response;
             },
             async (error) => {
+                // Clean up pending request registry even if request fails
+                if (error.config) {
+                    removePendingRequest(error.config);
+                }
+                
+                // Don't process cancelled requests further
+                if (error instanceof CanceledError || error.code === 'ERR_CANCELED') {
+                    log.debug('Request cancelled:', error.config?.url);
+                    return Promise.reject(error);
+                }
+                
                 const errorConfig = error.config || {};
                 const status = error.response?.status;
                 const method = errorConfig.method?.toLowerCase();
@@ -409,7 +465,7 @@ export const initializeApi = async (): Promise<AxiosInstance> => {
                     message: error.message,
                 });
 
-                // Use retryWithBackoff for server errors
+                // Use retryWithBackoff for server errors (skip cancelled requests)
                 const isIdempotent = ['get', 'put', 'delete'].includes(method || '');
                 if (isIdempotent && [502, 503, 504].includes(status)) {
                     return retryWithBackoff(() => apiInstance!(errorConfig));
@@ -559,5 +615,5 @@ export const api = {
 };
 
 export const getApi = async () => await apiPromise;
-
+export { CanceledError };
 export default api;

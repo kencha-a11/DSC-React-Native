@@ -1,5 +1,4 @@
-// src/services/authServices.ts
-import { api } from '../api/axios';
+import { api, CanceledError } from '../api/axios';
 import * as SecureStore from 'expo-secure-store';
 
 // ------------------------------
@@ -47,12 +46,6 @@ const log = {
     warn: (...args: any[]) => { },
     error: (...args: any[]) => { },
 };
-// const log = {
-//     debug: (...args: any[]) => __DEV__ && console.log("🔧 [AuthService]", ...args),
-//     info: (...args: any[]) => __DEV__ && console.log("🔧 [AuthService] ℹ️", ...args),
-//     warn: (...args: any[]) => __DEV__ && console.warn("🔧 [AuthService] ⚠️", ...args),
-//     error: (...args: any[]) => console.error("🔧 [AuthService] ❌", ...args),
-// };
 
 // ------------------------------
 // Timezone cache
@@ -71,6 +64,11 @@ const getTimezone = (() => {
 // Error message helper
 // ------------------------------
 const extractErrorMessage = (error: any, defaultMessage: string): string => {
+    // Handle cancellation errors
+    if (error instanceof CanceledError || error.code === 'ERR_CANCELED') {
+        return 'Operation cancelled';
+    }
+    
     // Handle our custom errors
     if (error.message && !error.response) {
         return error.message;
@@ -238,7 +236,7 @@ export const getUser = async (force = false): Promise<User> => {
             log.debug("User data fetched successfully");
             return data;
         } catch (error: any) {
-            // Clear token on 401
+            // Clear token on 401, but not on cancellation
             if (error.response?.status === 401) {
                 await SecureStore.deleteItemAsync('auth_token');
                 userCache = null;
@@ -262,8 +260,13 @@ export const logout = async (): Promise<void> => {
         await api.post('/logout', null, {
             headers: { 'X-Device-Timezone': getTimezone() },
         });
-    } catch (error) {
-        log.warn("Logout API error (ignored):", error);
+    } catch (error: any) {
+        // Ignore cancellation errors and network errors during logout
+        if (!(error instanceof CanceledError) && 
+            error.code !== 'ERR_CANCELED' && 
+            error.message !== 'Operation cancelled') {
+            log.warn("Logout API error (ignored):", error);
+        }
     } finally {
         // Always clear local state
         await SecureStore.deleteItemAsync('auth_token');
