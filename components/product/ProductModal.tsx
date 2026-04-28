@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   },
   bottomButtonContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 60,
     paddingTop: 10,
     backgroundColor: "#fff",
     borderTopWidth: 1,

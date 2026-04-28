@@ -1,4 +1,5 @@
-import React from "react";
+// app/(cashier)/(tabs)/profile.tsx
+import React, { useEffect, useState } from "react";
 import {
     View,
     Text,
@@ -6,6 +7,7 @@ import {
     ScrollView,
     Platform,
     TouchableOpacity,
+    ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,38 +16,69 @@ import { usePermissions } from "@/context/PermissionContext";
 import Header from "@/components/layout/Header";
 import LogoutButton from "@/components/common/LogoutButton";
 import { router, useSegments } from "expo-router";
+import { getUserProfile, UserProfile } from "@/services/profileService"; // ✅ Import from new service
 
 export default function ProfileTab() {
-    const { user } = useAuth();
+    const { user: authUser } = useAuth();
     const { permissions } = usePermissions();
     const insets = useSafeAreaInsets();
     const segments = useSegments();
+    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState<UserProfile | null>(null);
+
+    useEffect(() => {
+        const loadFullProfile = async () => {
+            try {
+                // ✅ Using the new profileService
+                const fullUser = await getUserProfile();
+                setProfile(fullUser);
+            } catch (error) {
+                console.error("Failed to load full profile:", error);
+                // Fallback to auth user if API fails
+                if (authUser) {
+                    setProfile(authUser as UserProfile);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (authUser) {
+            loadFullProfile();
+        } else {
+            setLoading(false);
+            setProfile(null);
+        }
+    }, [authUser]);
 
     const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 60 : 80;
     const bottomPadding = TAB_BAR_HEIGHT + insets.bottom + 20;
+
+    // Use profile for display (contains email/phone), fallback to authUser
+    const displayUser = profile || authUser;
 
     const enabledPermissions = Object.values(permissions).filter(Boolean).length;
     const totalPermissions = Object.keys(permissions).length;
 
     const getFullName = () => {
-        if (user?.first_name && user?.last_name) {
-            return `${user.first_name} ${user.last_name}`;
+        if (displayUser?.first_name && displayUser?.last_name) {
+            return `${displayUser.first_name} ${displayUser.last_name}`;
         }
         return "Cashier User";
     };
 
     const getInitials = () => {
-        if (!user?.first_name && !user?.last_name) {
+        if (!displayUser?.first_name && !displayUser?.last_name) {
             return "U";
         }
-        const first = user?.first_name?.charAt(0) || "";
-        const last = user?.last_name?.charAt(0) || "";
+        const first = displayUser?.first_name?.charAt(0) || "";
+        const last = displayUser?.last_name?.charAt(0) || "";
         return (first + last).toUpperCase();
     };
 
-    const rawRole = user?.role?.toLowerCase().replace(/\s/g, "") || "cashier";
-    const displayRole = user?.role
-        ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+    const rawRole = displayUser?.role?.toLowerCase().replace(/\s/g, "") || "cashier";
+    const displayRole = displayUser?.role
+        ? displayUser.role.charAt(0).toUpperCase() + displayUser.role.slice(1)
         : "Cashier";
 
     const isSuperadmin = rawRole === "superadmin";
@@ -62,6 +95,9 @@ export default function ProfileTab() {
         } else if (seg === "(cashier)" || seg === "cashier") {
             currentView = "cashier";
             break;
+        } else if (seg === "(superadmin)" || seg === "superadmin") {
+            currentView = "superadmin";
+            break;
         }
     }
 
@@ -73,13 +109,10 @@ export default function ProfileTab() {
     // Determine allowed views based on user's actual role
     let allowedViews: string[] = [];
     if (isSuperadmin) {
-        // Superadmin can access manager and cashier views
-        allowedViews = ["manager", "cashier"];
+        allowedViews = ["superadmin", "manager", "cashier"];
     } else if (isManager) {
-        // Manager can access manager and cashier views
         allowedViews = ["manager", "cashier"];
     } else {
-        // Cashier has no switch options
         allowedViews = [];
     }
 
@@ -91,8 +124,35 @@ export default function ProfileTab() {
             router.replace("/(cashier)/(tabs)" as any);
         } else if (targetRole === "manager") {
             router.replace("/(manager)/(tabs)" as any);
+        } else if (targetRole === "superadmin") {
+            router.replace("/(superadmin)/(tabs)" as any);
         }
     };
+
+    const getRoleDisplayName = (role: string) => {
+        return role.charAt(0).toUpperCase() + role.slice(1);
+    };
+
+    const getRoleIcon = (role: string) => {
+        switch(role) {
+            case "superadmin":
+                return "shield-outline";
+            case "manager":
+                return "briefcase-outline";
+            case "cashier":
+                return "cart-outline";
+            default:
+                return "person-outline";
+        }
+    };
+
+    if (loading) {
+        return (
+            <View style={[styles.container, styles.center]}>
+                <ActivityIndicator size="large" color="#ED277C" />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -126,14 +186,14 @@ export default function ProfileTab() {
                         <Ionicons name="mail-outline" size={24} color="#ED277C" />
                         <Text style={styles.infoLabel}>Email</Text>
                         <Text style={styles.infoValue} numberOfLines={1}>
-                            {user?.email || "No email"}
+                            {displayUser?.email || "No email"}
                         </Text>
                     </View>
                     <View style={styles.infoCard}>
                         <Ionicons name="call-outline" size={24} color="#ED277C" />
                         <Text style={styles.infoLabel}>Phone</Text>
                         <Text style={styles.infoValue} numberOfLines={1}>
-                            {user?.phone_number || "No phone"}
+                            {displayUser?.phone_number || "No phone"}
                         </Text>
                     </View>
                 </View>
@@ -168,13 +228,27 @@ export default function ProfileTab() {
                             <Text style={styles.sectionTitle}>Switch Role View</Text>
                         </View>
                         <View style={styles.roleActions}>
+                            {viewsToDisplay.includes("superadmin") && (
+                                <TouchableOpacity
+                                    style={styles.switchButton}
+                                    onPress={() => handleSwitchRole("superadmin")}
+                                >
+                                    <Ionicons name={getRoleIcon("superadmin")} size={20} color="#fff" />
+                                    <Text style={styles.switchButtonText}>
+                                        Switch to {getRoleDisplayName("superadmin")}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+
                             {viewsToDisplay.includes("manager") && (
                                 <TouchableOpacity
                                     style={styles.switchButton}
                                     onPress={() => handleSwitchRole("manager")}
                                 >
-                                    <Ionicons name="briefcase-outline" size={20} color="#fff" />
-                                    <Text style={styles.switchButtonText}>Switch to Manager</Text>
+                                    <Ionicons name={getRoleIcon("manager")} size={20} color="#fff" />
+                                    <Text style={styles.switchButtonText}>
+                                        Switch to {getRoleDisplayName("manager")}
+                                    </Text>
                                 </TouchableOpacity>
                             )}
 
@@ -183,8 +257,10 @@ export default function ProfileTab() {
                                     style={styles.switchButton}
                                     onPress={() => handleSwitchRole("cashier")}
                                 >
-                                    <Ionicons name="cart-outline" size={20} color="#fff" />
-                                    <Text style={styles.switchButtonText}>Switch to Cashier</Text>
+                                    <Ionicons name={getRoleIcon("cashier")} size={20} color="#fff" />
+                                    <Text style={styles.switchButtonText}>
+                                        Switch to {getRoleDisplayName("cashier")}
+                                    </Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -199,16 +275,28 @@ export default function ProfileTab() {
                     </View>
                     <View style={styles.infoRow}>
                         <Text style={styles.infoRowLabel}>First Name</Text>
-                        <Text style={styles.infoRowValue}>{user?.first_name || "N/A"}</Text>
+                        <Text style={styles.infoRowValue}>{displayUser?.first_name || "N/A"}</Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Text style={styles.infoRowLabel}>Last Name</Text>
-                        <Text style={styles.infoRowValue}>{user?.last_name || "N/A"}</Text>
+                        <Text style={styles.infoRowValue}>{displayUser?.last_name || "N/A"}</Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Text style={styles.infoRowLabel}>Role</Text>
                         <Text style={styles.infoRowValue}>{displayRole}</Text>
                     </View>
+                    {displayUser?.email && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoRowLabel}>Email</Text>
+                            <Text style={styles.infoRowValue}>{displayUser.email}</Text>
+                        </View>
+                    )}
+                    {displayUser?.phone_number && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoRowLabel}>Phone</Text>
+                            <Text style={styles.infoRowValue}>{displayUser.phone_number}</Text>
+                        </View>
+                    )}
                 </View>
 
                 <LogoutButton />
@@ -221,6 +309,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#fff",
+    },
+    center: {
+        justifyContent: "center",
+        alignItems: "center",
     },
     placeholder: {
         width: 24,

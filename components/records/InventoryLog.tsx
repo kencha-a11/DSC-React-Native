@@ -1,3 +1,4 @@
+// components/records/InventoryLog.tsx
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useCallback, useMemo } from "react";
 import {
@@ -14,7 +15,7 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "expo-router";
-import { getInventoryLogs, InventoryLog as InventoryLogType } from "@/services/records/inventoryLogServices";
+import { getInventoryLogs, InventoryLog as InventoryLogType } from "@/services/records/inventoryLogService";
 
 type InventoryAction = 'created' | 'update' | 'restock' | 'deducted' | 'deleted' | 'adjusted';
 
@@ -29,7 +30,11 @@ const ACTION_DISPLAY_NAMES: Record<InventoryAction, string> = {
     adjusted: 'Adjusted quantity',
 };
 
-export default function InventoryLog() {
+interface InventoryLogProps {
+    userId: number;
+}
+
+export default function InventoryLog({ userId }: InventoryLogProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedActions, setSelectedActions] = useState<Set<InventoryAction>>(new Set());
     const [startDate, setStartDate] = useState<Date | null>(null);
@@ -40,11 +45,10 @@ export default function InventoryLog() {
     const [allInventory, setAllInventory] = useState<InventoryLogType[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // Fetch all inventory logs once (no backend filtering)
     const fetchAllLogs = async () => {
         setLoading(true);
         try {
-            const response = await getInventoryLogs({});
+            const response = await getInventoryLogs({ user_id: userId });
             setAllInventory(response.data);
         } catch (error) {
             console.error(error);
@@ -56,14 +60,12 @@ export default function InventoryLog() {
     useFocusEffect(
         useCallback(() => {
             fetchAllLogs();
-        }, [])
+        }, [userId])
     );
 
-    // Client-side filtering (search, actions, date range)
     const filteredInventory = useMemo(() => {
         let result = allInventory;
 
-        // Filter by search (user name or product name)
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
             result = result.filter(item =>
@@ -72,14 +74,12 @@ export default function InventoryLog() {
             );
         }
 
-        // Filter by selected actions
         if (selectedActions.size > 0) {
             result = result.filter(item =>
                 selectedActions.has(item.action.toLowerCase() as InventoryAction)
             );
         }
 
-        // Filter by date range
         if (startDate || endDate) {
             result = result.filter(item => {
                 const itemDate = new Date(item.created_at);
@@ -180,7 +180,6 @@ export default function InventoryLog() {
 
     return (
         <View style={{ flex: 1 }}>
-            {/* Search + Filter Button */}
             <View style={styles.searchSection}>
                 <View style={styles.searchInputContainer}>
                     <TextInput
@@ -199,7 +198,6 @@ export default function InventoryLog() {
                 </TouchableOpacity>
             </View>
 
-            {/* Active filters summary */}
             {hasActiveFilters && (
                 <View style={styles.activeFiltersContainer}>
                     <Text style={styles.activeFiltersText}>
@@ -214,7 +212,6 @@ export default function InventoryLog() {
                 </View>
             )}
 
-            {/* Filter Modal (Actions + Date Range) */}
             <Modal
                 visible={filterModalVisible}
                 animationType="slide"
@@ -231,7 +228,6 @@ export default function InventoryLog() {
                         </View>
 
                         <ScrollView style={styles.modalScroll}>
-                            {/* Action filters */}
                             <Text style={styles.filterSectionTitle}>Action Type</Text>
                             {ALL_ACTIONS.map(action => (
                                 <TouchableOpacity
@@ -250,7 +246,6 @@ export default function InventoryLog() {
                                 </TouchableOpacity>
                             ))}
 
-                            {/* Date range filters */}
                             <Text style={[styles.filterSectionTitle, { marginTop: 16 }]}>Date Range</Text>
                             <TouchableOpacity
                                 style={styles.dateButton}
@@ -312,7 +307,6 @@ export default function InventoryLog() {
                 </View>
             </Modal>
 
-            {/* List */}
             {loading ? (
                 <ActivityIndicator style={{ marginTop: 20 }} color="#ED277C" />
             ) : (

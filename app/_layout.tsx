@@ -3,7 +3,6 @@ import { AppProviders } from "@/providers";
 import { AuthGuard } from "@/context/AuthGuard";
 import { Slot, SplashScreen } from "expo-router";
 import { useEffect, useState, useCallback } from "react";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -39,12 +38,10 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
       <AppProviders>
         <AuthGuard>
           <Slot />
         </AuthGuard>
       </AppProviders>
-    </SafeAreaProvider>
   );
 }

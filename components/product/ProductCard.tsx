@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from "react-native";
+import FALLBACK_IMAGE from "@/assets/images/no-image.jpg";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48) / 2;
@@ -64,11 +65,7 @@ export default function ProductCard({
         {image ? (
           <Image source={{ uri: image }} style={styles.gridImage} />
         ) : (
-          <View style={styles.gridImagePlaceholder}>
-            <Text style={styles.gridImagePlaceholderText}>
-              {getInitials(name)}
-            </Text>
-          </View>
+          <Image source={FALLBACK_IMAGE} style={styles.gridImage} />
         )}
 
         {/* Stock badge */}

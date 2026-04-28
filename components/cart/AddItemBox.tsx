@@ -15,21 +15,17 @@ export default function AddItemBox({
 }: AddItemBoxProps) {
   return (
     <View style={styles.container} testID="add-item-box">
-      {/* + Add item link */}
-      <TouchableOpacity onPress={onAddItem} testID="add-item-button">
+
+      {/* WRAPPER: Now takes all available space and is fully touchable */}
+      <TouchableOpacity
+        style={styles.addWrapper}
+        onPress={onAddItem}
+        testID="add-item-button"
+      >
         <Text style={styles.addText}>+ Add item</Text>
       </TouchableOpacity>
 
       <View style={styles.buttonContainer}>
-        {/* Search icon */}
-        <TouchableOpacity
-          style={styles.iconContainer}
-          onPress={onSearch}
-          testID="search-button"
-        >
-          <Ionicons name="search" size={25} color="#ED277C" />
-        </TouchableOpacity>
-
         {/* Barcode icon */}
         <TouchableOpacity
           style={styles.iconContainer}
@@ -51,26 +47,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: "dashed",
     borderColor: "#ED277C",
-    padding: 8,
     borderRadius: 8,
     marginHorizontal: 16,
     marginVertical: 12,
+    // Removed padding from here to let the touchable handle it
+  },
+  addWrapper: {
+    flex: 1, // <--- This forces it to fill the left side
+    paddingVertical: 24, // Matches your desired height
+    paddingHorizontal: 16,
   },
   addText: {
     color: "#ED277C",
     fontWeight: "600",
     fontSize: 22,
-    paddingHorizontal: 40,
-    paddingVertical: 16,
   },
   buttonContainer: {
     flexDirection: "row",
-    gap: 18,
+    paddingRight: 8, // Adds some breathing room from the edge
   },
   iconContainer: {
     padding: 12,
     borderWidth: 1,
     borderRadius: 10,
     borderColor: "#ED277C",
+    marginRight: 8,
   },
 });

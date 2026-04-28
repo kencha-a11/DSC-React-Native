@@ -27,7 +27,7 @@ interface CategorySliderProps {
 
 export default function CategorySlider({
   onCategoryChange,
-  selectedCategoryId = 1,
+  selectedCategoryId = -1,
 }: CategorySliderProps) {
   const { categories, loading: categoriesLoading } = useCategories();
   const { products, loading: productsLoading } = useProducts();
@@ -47,7 +47,7 @@ export default function CategorySlider({
 
     // Add "All items" first with total product count
     list.push({
-      id: 1,
+      id: -1,
       name: "All items",
       count: products.length,
     });
@@ -56,31 +56,30 @@ export default function CategorySlider({
       return list;
     }
 
-    // Count products per category (unique products)
+    // Count products per category using category_ids
     const categoryCounts = new Map<number, number>();
 
     products.forEach((product) => {
-      if (product.categories && Array.isArray(product.categories)) {
+      // Use category_ids from your Product type
+      if (product.category_ids && Array.isArray(product.category_ids)) {
+        // Use a Set to ensure each product is counted once per category
         const uniqueCategories = new Set<number>();
 
-        product.categories.forEach((cat) => {
-          if (cat && cat.id) {
-            uniqueCategories.add(cat.id);
-          }
+        product.category_ids.forEach((catId: number) => {
+          uniqueCategories.add(catId);
         });
 
         uniqueCategories.forEach((catId: number) => {
           categoryCounts.set(catId, (categoryCounts.get(catId) || 0) + 1);
         });
+      } else if (product.category_id) {
+        // Fallback to single category_id
+        categoryCounts.set(product.category_id, (categoryCounts.get(product.category_id) || 0) + 1);
       }
     });
 
-    // Add categories with their product counts - SKIP ID 1
+    // Add categories with their product counts
     categories.forEach((cat) => {
-      if (cat.id === 1) {
-        return;
-      }
-
       const count = categoryCounts.get(cat.id) || 0;
       if (count > 0) {
         list.push({
@@ -102,13 +101,18 @@ export default function CategorySlider({
     if (index !== -1 && scrollViewRef.current) {
       scrollViewRef.current.scrollTo({
         x: index * 100,
-        animated: false, // Disabled animation
+        animated: false,
       });
     }
   };
 
+  // Show ActivityIndicator while loading instead of skeleton
   if (categoriesLoading || productsLoading) {
-    return <CategorySliderSkeleton />;
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="small" color="#ED277C" />
+      </View>
+    );
   }
 
   if (categoryList.length <= 1) {
@@ -133,7 +137,7 @@ export default function CategorySlider({
                 isActive && styles.activeCategoryItem,
               ]}
               onPress={() => handleCategoryPress(category.id, category.name)}
-              activeOpacity={1} // Removed opacity animation
+              activeOpacity={1}
             >
               <Text
                 style={[
@@ -169,30 +173,18 @@ export default function CategorySlider({
   );
 }
 
-// Skeleton loader for categories
-export const CategorySliderSkeleton = () => (
-  <View style={styles.container}>
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.scrollContent}
-    >
-      {[1, 2, 3, 4].map((item) => (
-        <View
-          key={`skeleton-${item}`}
-          style={[styles.categoryItem, styles.skeletonItem]}
-        >
-          <View style={styles.skeletonText} />
-        </View>
-      ))}
-    </ScrollView>
-  </View>
-);
-
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#fff",
     paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  loadingContainer: {
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
@@ -237,16 +229,5 @@ const styles = StyleSheet.create({
   },
   activeCountText: {
     color: "#ED277C",
-  },
-  skeletonItem: {
-    backgroundColor: "#f0f0f0",
-    minWidth: 80,
-    height: 36,
-  },
-  skeletonText: {
-    width: 60,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#ddd",
   },
 });

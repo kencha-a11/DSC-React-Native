@@ -1,4 +1,4 @@
-// components/records/SaleLog.tsx
+// components/records/TimeLog.tsx
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useCallback } from "react";
 import {
@@ -15,52 +15,52 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "expo-router";
-import { getSalesLogs, SaleLog as SaleLogType } from "@/services/records/salesLogServices";
+import { getTimeLogs, TimeLog as TimeLogType } from "@/services/records/timeLogService";
 
-interface SaleLogProps {
+interface TimeLogProps {
     userId: number;
 }
 
-export default function SaleLog({ userId }: SaleLogProps) {
+export default function TimeLog({ userId }: TimeLogProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [startDate, setStartDate] = useState<Date | null>(null);
     const [endDate, setEndDate] = useState<Date | null>(null);
     const [filterModalVisible, setFilterModalVisible] = useState(false);
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
-    const [sales, setSales] = useState<SaleLogType[]>([]);
+    const [timeLogs, setTimeLogs] = useState<TimeLogType[]>([]);
     const [loading, setLoading] = useState(false);
-    const [selectedSale, setSelectedSale] = useState<SaleLogType | null>(null);
+    const [selectedLog, setSelectedLog] = useState<TimeLogType | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
 
     const fetchLogs = async () => {
         setLoading(true);
         try {
-            const response = await getSalesLogs({ user_id: userId });
+            const response = await getTimeLogs({ user_id: userId });
             let data = response.data;
 
-            if (searchQuery.trim()) {
+            if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                data = data.filter(sale =>
-                    sale.user?.name?.toLowerCase().includes(q) ||
-                    sale.user?.first_name?.toLowerCase().includes(q)
+                data = data.filter(log =>
+                    log.user?.name?.toLowerCase().includes(q) ||
+                    log.user?.email?.toLowerCase().includes(q)
                 );
             }
 
             if (startDate || endDate) {
-                data = data.filter(sale => {
-                    const saleDate = new Date(sale.created_at);
-                    if (startDate && saleDate < startDate) return false;
+                data = data.filter(log => {
+                    const logDate = new Date(log.start_time || log.created_at);
+                    if (startDate && logDate < startDate) return false;
                     if (endDate) {
                         const endOfDay = new Date(endDate);
                         endOfDay.setHours(23, 59, 59, 999);
-                        if (saleDate > endOfDay) return false;
+                        if (logDate > endOfDay) return false;
                     }
                     return true;
                 });
             }
 
-            setSales(data);
+            setTimeLogs(data);
         } catch (error) {
             console.error(error);
         } finally {
@@ -88,8 +88,19 @@ export default function SaleLog({ userId }: SaleLogProps) {
         return name ? name.charAt(0).toUpperCase() : "?";
     };
 
-    const openSaleDetails = (sale: SaleLogType) => {
-        setSelectedSale(sale);
+    const formatDuration = (start: string | null, end: string | null) => {
+        if (!start) return "N/A";
+        const startDate = new Date(start);
+        const endDate = end ? new Date(end) : new Date();
+        const diffMinutes = Math.floor((endDate.getTime() - startDate.getTime()) / 60000);
+        if (diffMinutes < 60) return `${diffMinutes} min`;
+        const hours = Math.floor(diffMinutes / 60);
+        const minutes = diffMinutes % 60;
+        return `${hours}h ${minutes}m`;
+    };
+
+    const openLogDetails = (log: TimeLogType) => {
+        setSelectedLog(log);
         setModalVisible(true);
     };
 
@@ -105,26 +116,28 @@ export default function SaleLog({ userId }: SaleLogProps) {
 
     const hasActiveFilters = searchQuery.length > 0 || startDate !== null || endDate !== null;
 
-    const renderItem = ({ item }: { item: SaleLogType }) => {
-        const name = item.user?.name || item.user?.first_name || "Unknown User";
-        const itemCount = item.sale_items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+    const renderItem = ({ item }: { item: TimeLogType }) => {
+        const name = item.user?.name || "Unknown User";
+        const status = item.status === 'logged_in' ? 'Online' : 'Offline';
+        const statusColor = item.status === 'logged_in' ? '#28a745' : '#dc3545';
+        const duration = formatDuration(item.start_time, item.end_time);
 
         return (
             <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => openSaleDetails(item)}
+                onPress={() => openLogDetails(item)}
                 style={styles.card}
             >
-                <View style={[styles.avatar, { backgroundColor: "#38b000" }]}>
-                    <Text style={styles.avatarText}>{getInitials(name)}</Text>
+                <View style={[styles.avatar, { backgroundColor: statusColor }]}>
+                    <Ionicons name={item.status === 'logged_in' ? "log-in" : "log-out"} size={22} color="#fff" />
                 </View>
                 <View style={styles.content}>
                     <Text style={styles.name}>{name}</Text>
-                    <Text style={styles.subtitle}>Sold {itemCount} items</Text>
-                    <Text style={[styles.amount, { color: "#2a9d8f" }]}>₱ {item.total_amount}</Text>
+                    <Text style={[styles.subtitle, { color: statusColor }]}>{status}</Text>
+                    <Text style={styles.itemDetail}>Duration: {duration}</Text>
                 </View>
                 <View style={styles.timeContainer}>
-                    <Text style={styles.time}>{formatTime(item.created_at)}</Text>
+                    <Text style={styles.time}>{formatTime(item.start_time || item.created_at)}</Text>
                 </View>
             </TouchableOpacity>
         );
@@ -136,7 +149,7 @@ export default function SaleLog({ userId }: SaleLogProps) {
                 <View style={styles.searchInputContainer}>
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Search sales records"
+                        placeholder="Search time logs"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholderTextColor="#999"
@@ -171,12 +184,12 @@ export default function SaleLog({ userId }: SaleLogProps) {
                 <ActivityIndicator style={{ marginTop: 20 }} color="#ED277C" />
             ) : (
                 <FlatList
-                    data={sales}
+                    data={timeLogs}
                     keyExtractor={(item) => String(item.id)}
                     renderItem={renderItem}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
-                    ListEmptyComponent={<Text style={styles.emptyText}>No sales records found</Text>}
+                    ListEmptyComponent={<Text style={styles.emptyText}>No time logs found</Text>}
                 />
             )}
 
@@ -254,9 +267,9 @@ export default function SaleLog({ userId }: SaleLogProps) {
                 onRequestClose={() => setModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.summaryCard}>
+                    <View style={styles.detailCard}>
                         <View style={styles.summaryHeader}>
-                            <Text style={styles.summaryTitle}>Sales summary</Text>
+                            <Text style={styles.summaryTitle}>Time Log Details</Text>
                             <TouchableOpacity onPress={() => setModalVisible(false)}>
                                 <Ionicons name="close" size={24} color="#333" />
                             </TouchableOpacity>
@@ -264,47 +277,39 @@ export default function SaleLog({ userId }: SaleLogProps) {
 
                         <View style={styles.divider} />
 
-                        <View style={styles.summaryInfoSection}>
-                            <View style={styles.summaryLeftInfo}>
-                                <View style={[styles.summaryAvatar, { backgroundColor: "#38b000" }]}>
-                                    <Text style={styles.summaryAvatarText}>
-                                        {getInitials(selectedSale?.user?.name || selectedSale?.user?.first_name)}
-                                    </Text>
-                                </View>
-                                <View style={styles.summaryCustomerDetails}>
-                                    <Text style={styles.summaryCustomerName}>
-                                        {selectedSale?.user?.name || selectedSale?.user?.first_name || "Unknown"}
-                                    </Text>
-                                    <Text style={styles.summaryItemCount}>
-                                        Sold {selectedSale?.sale_items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0} items
-                                    </Text>
-                                    <Text style={styles.summaryTotalGreen}>
-                                        ₱ {selectedSale?.total_amount}
-                                    </Text>
-                                </View>
+                        <View style={styles.detailContent}>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>User</Text>
+                                <Text style={styles.detailValue}>{selectedLog?.user?.name || "Unknown"}</Text>
                             </View>
-                            <View style={styles.summaryRightInfo}>
-                                <Text style={styles.summaryDateTime}>
-                                    {selectedSale ? formatTime(selectedSale.created_at) : ""}
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Email</Text>
+                                <Text style={styles.detailValue}>{selectedLog?.user?.email || "N/A"}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Status</Text>
+                                <Text style={[styles.detailValue, { color: selectedLog?.status === 'logged_in' ? '#28a745' : '#dc3545' }]}>
+                                    {selectedLog?.status === 'logged_in' ? 'Online' : 'Offline'}
                                 </Text>
                             </View>
-                        </View>
-
-                        <View style={styles.tableContainer}>
-                            <View style={styles.tableHeader}>
-                                <Text style={[styles.colLabel, { flex: 4 }]}>Product</Text>
-                                <Text style={[styles.colLabel, { flex: 2, textAlign: 'center' }]}>Quantity</Text>
-                                <Text style={[styles.colLabel, { flex: 3, textAlign: 'right' }]}>Subtotal</Text>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Start Time</Text>
+                                <Text style={styles.detailValue}>
+                                    {selectedLog?.start_time ? new Date(selectedLog.start_time).toLocaleString() : "N/A"}
+                                </Text>
                             </View>
-                            <ScrollView style={styles.tableScroll} showsVerticalScrollIndicator={false}>
-                                {selectedSale?.sale_items?.map((item, index) => (
-                                    <View key={index} style={styles.tableRow}>
-                                        <Text style={[styles.colText, { flex: 4 }]}>{item.product?.name || `ID: ${item.product_id}`}</Text>
-                                        <Text style={[styles.colText, { flex: 2, textAlign: 'center' }]}>{item.quantity}</Text>
-                                        <Text style={[styles.colText, { flex: 3, textAlign: 'right' }]}>₱ {item.subtotal}</Text>
-                                    </View>
-                                ))}
-                            </ScrollView>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>End Time</Text>
+                                <Text style={styles.detailValue}>
+                                    {selectedLog?.end_time ? new Date(selectedLog.end_time).toLocaleString() : "Ongoing"}
+                                </Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Duration</Text>
+                                <Text style={styles.detailValue}>
+                                    {selectedLog ? formatDuration(selectedLog.start_time, selectedLog.end_time) : "N/A"}
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 </View>
@@ -471,11 +476,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginRight: 12,
     },
-    avatarText: {
-        color: "#fff",
-        fontSize: 18,
-        fontWeight: "600",
-    },
     content: {
         flex: 1,
     },
@@ -483,15 +483,15 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: "600",
         color: "#333",
+        marginBottom: 2,
     },
     subtitle: {
         fontSize: 13,
-        color: "#666",
-        marginVertical: 1,
+        marginBottom: 2,
     },
-    amount: {
+    itemDetail: {
         fontSize: 13,
-        fontWeight: "600",
+        color: "#666",
     },
     timeContainer: {
         alignSelf: "flex-start",
@@ -501,7 +501,11 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         color: "#333",
     },
-    summaryCard: {
+    divider: {
+        height: 1,
+        backgroundColor: "#eaeaea",
+    },
+    detailCard: {
         backgroundColor: "#fff",
         borderRadius: 12,
         width: "100%",
@@ -521,87 +525,20 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         color: "#1a1a1a",
     },
-    divider: {
-        height: 1,
-        backgroundColor: "#eaeaea",
+    detailContent: {
+        padding: 20,
     },
-    summaryInfoSection: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-        paddingVertical: 16,
+    detailRow: {
+        marginBottom: 16,
     },
-    summaryLeftInfo: {
-        flexDirection: "row",
-        gap: 16,
-    },
-    summaryAvatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    summaryAvatarText: {
-        color: "#fff",
-        fontSize: 24,
-        fontWeight: "600",
-    },
-    summaryCustomerDetails: {
-        gap: 2,
-    },
-    summaryCustomerName: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#1a1a1a",
-    },
-    summaryItemCount: {
-        fontSize: 14,
+    detailLabel: {
+        fontSize: 12,
         color: "#666",
+        marginBottom: 4,
     },
-    summaryTotalGreen: {
+    detailValue: {
         fontSize: 16,
-        fontWeight: "600",
-        color: "#2a9d8f",
-    },
-    summaryRightInfo: {
-        alignItems: "flex-end",
-    },
-    summaryDateTime: {
-        fontSize: 14,
+        color: "#333",
         fontWeight: "500",
-        color: "#1a1a1a",
-    },
-    tableContainer: {
-        backgroundColor: "#f5f5f5",
-        marginTop: 8,
-    },
-    tableHeader: {
-        flexDirection: "row",
-        backgroundColor: "#efefef",
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-    },
-    colLabel: {
-        fontSize: 13,
-        color: "#666",
-        fontWeight: "600",
-    },
-    tableScroll: {
-        maxHeight: 250,
-        backgroundColor: "#fff",
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-    },
-    tableRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f0f0f0",
-    },
-    colText: {
-        fontSize: 14,
-        color: "#1a1a1a",
     },
 });

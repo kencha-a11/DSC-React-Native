@@ -38,6 +38,7 @@ export interface AccountResponse {
     role: string;
     account_status: string;
     pin_code?: string;
+    created_at?: string;
 }
 
 export interface PaginatedResponse<T> {
