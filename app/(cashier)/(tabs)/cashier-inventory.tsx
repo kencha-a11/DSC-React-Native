@@ -184,7 +184,7 @@ export default function CashierInventoryScreen() {
   const [filters, setFilters] = useState({
     search: "",
     categoryId: null as string | null,
-    status: null as string | null, // client-side filter, not sent to API
+    status: null as string | null,
   });
   const [showFilters, setShowFilters] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -199,7 +199,6 @@ export default function CashierInventoryScreen() {
     }, TOAST_DURATION);
   }, []);
 
-  // Fetch all products (no status filter sent to API)
   const fetchData = useCallback(async () => {
     console.log("🔄 [InventoryScreen] fetchData called");
     await Promise.all([
@@ -212,18 +211,15 @@ export default function CashierInventoryScreen() {
     ]);
   }, [fetchProducts, fetchCategories, filters.categoryId, filters.search]);
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => fetchData(), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [filters.search, fetchData]);
 
-  // Immediate category change
   useEffect(() => {
     fetchData();
   }, [filters.categoryId, fetchData]);
 
-  // Initial load
   useEffect(() => {
     if (permissions.canView) {
       console.log("🚀 [InventoryScreen] Initial load");
@@ -244,10 +240,8 @@ export default function CashierInventoryScreen() {
     }
   }, [fetchData, showToast]);
 
-  // Client-side filtering
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      // Compute status using the same logic as ProductCard
       const stockQuantity = product.stock_quantity;
       const threshold = product.low_stock_threshold ?? 0;
       let productStatus: "in_stock" | "low_stock" | "out_of_stock";
@@ -255,15 +249,9 @@ export default function CashierInventoryScreen() {
       else if (stockQuantity <= threshold) productStatus = "low_stock";
       else productStatus = "in_stock";
 
-      // Apply status filter
       if (filters.status && filters.status !== productStatus) return false;
-
-      // Apply category filter
       if (filters.categoryId && !product.category_ids?.includes(Number(filters.categoryId))) return false;
-
-      // Apply search filter
       if (filters.search && !product.name.toLowerCase().includes(filters.search.toLowerCase())) return false;
-
       return true;
     });
   }, [products, filters]);
@@ -271,7 +259,6 @@ export default function CashierInventoryScreen() {
   const activeFilterCount = (filters.categoryId ? 1 : 0) + (filters.status ? 1 : 0);
   const isLoading = (productsLoading || categoriesLoading) && !refreshing;
 
-  // Modal state
   const [activeModal, setActiveModal] = useState<ModalType | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const selectedProduct = products.find(p => p.id === selectedProductId);
@@ -450,13 +437,13 @@ export default function CashierInventoryScreen() {
         </View>
       )}
 
-      {/* Quick actions */}
-      {(permissions.canAdd || permissions.canCreateCategory) && (
+      {/* Quick action bar - Manage Categories (if permission) + New Category (if permission) */}
+      {(permissions.canRemoveCategory || permissions.canCreateCategory) && (
         <View style={styles.quickActionBar}>
-          {permissions.canAdd && (
-            <TouchableOpacity style={styles.quickAction} onPress={() => openModal("addProduct")}>
-              <Ionicons name="add-circle" size={20} color="#ED277C" />
-              <Text style={styles.quickActionText}>Add Product</Text>
+          {permissions.canRemoveCategory && (
+            <TouchableOpacity style={styles.quickAction} onPress={() => openModal("manageCategories")}>
+              <Ionicons name="settings-outline" size={20} color="#ED277C" />
+              <Text style={styles.quickActionText}>Manage Categories</Text>
             </TouchableOpacity>
           )}
           {permissions.canCreateCategory && (
@@ -510,11 +497,11 @@ export default function CashierInventoryScreen() {
         />
       )}
 
-      {/* Manage categories FAB */}
-      {permissions.canRemoveCategory && (
-        <TouchableOpacity style={styles.manageCategoriesButton} onPress={() => openModal("manageCategories")}>
-          <Ionicons name="settings-outline" size={20} color="#fff" />
-          <Text style={styles.manageCategoriesText}>Manage Categories</Text>
+      {/* Add Product FAB (moved from quick action bar to bottom) */}
+      {permissions.canAdd && (
+        <TouchableOpacity style={styles.manageCategoriesButton} onPress={() => openModal("addProduct")}>
+          <Ionicons name="add-circle" size={20} color="#fff" />
+          <Text style={styles.manageCategoriesText}>Add Product</Text>
         </TouchableOpacity>
       )}
     </View>

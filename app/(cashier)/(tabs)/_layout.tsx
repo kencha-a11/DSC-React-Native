@@ -1,8 +1,10 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Tabs, router } from "expo-router";
-import { Platform, View, Text, TouchableWithoutFeedback, StyleSheet } from "react-native";
+import { View, Text, TouchableWithoutFeedback, StyleSheet } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { usePermissions } from "@/context/PermissionContext";
+import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type FontAwesome5IconName = React.ComponentProps<typeof FontAwesome5>["name"];
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
@@ -21,7 +23,8 @@ const TabIcon = ({ library, name, color }: { library: TabItem["library"]; name: 
   return <MaterialIcons name={name as MaterialIconName} size={24} color={color} />;
 };
 
-function CustomTabBar({ state, navigation }: any) {
+function CustomTabBar({ state, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
   const { hasPermission } = usePermissions();
 
   const hasInventoryAccess =
@@ -32,7 +35,6 @@ function CustomTabBar({ state, navigation }: any) {
     hasPermission("deduct_items") ||
     hasPermission("remove_items");
 
-  // Define visible tabs based on permissions
   const tabs: TabItem[] = [
     { name: "index", title: "Home", icon: "home", library: "FontAwesome5" },
     ...(hasInventoryAccess
@@ -51,18 +53,11 @@ function CustomTabBar({ state, navigation }: any) {
       icon: "account-circle" as MaterialIconName,
       library: "MaterialIcons" as const,
     },
-    // {
-    //   name: "test",
-    //   title: "test",
-    //   icon: "test-circle" as MaterialIconName,
-    //   library: "MaterialIcons" as const,
-    // },
   ];
 
   const handleTabPress = (tabName: string, isFocused: boolean) => {
     if (isFocused) return;
 
-    // Emit event to allow any listeners (optional)
     const event = navigation.emit({
       type: "tabPress",
       target: tabName,
@@ -70,7 +65,6 @@ function CustomTabBar({ state, navigation }: any) {
     });
 
     if (!event.defaultPrevented) {
-      // Navigate using Expo Router – explicit literals to satisfy TypeScript
       if (tabName === "index") {
         router.push("/(cashier)/(tabs)");
       } else if (tabName === "cashier-inventory") {
@@ -78,24 +72,17 @@ function CustomTabBar({ state, navigation }: any) {
       } else if (tabName === "profile") {
         router.push("/(cashier)/(tabs)/profile");
       }
-      // else if (tabName === "test") {
-      //   router.push("/(cashier)/(tabs)/test")
-      // }
     }
   };
 
   return (
-    <View style={styles.tabBar}>
+    <View style={[styles.tabBar, { paddingBottom: insets.bottom || 12 }]}>
       {tabs.map((tab) => {
-        // ✅ Fix: Determine focus by comparing route names, not indices
         const isFocused = state.routes[state.index].name === tab.name;
         const color = isFocused ? "#ED277C" : "#999";
 
         return (
-          <TouchableWithoutFeedback
-            key={tab.name}
-            onPress={() => handleTabPress(tab.name, isFocused)}
-          >
+          <TouchableWithoutFeedback key={tab.name} onPress={() => handleTabPress(tab.name, isFocused)}>
             <View style={styles.tabItem}>
               <TabIcon library={tab.library} name={tab.icon} color={color} />
               <Text style={[styles.tabText, { color }]}>{tab.title}</Text>
@@ -106,28 +93,6 @@ function CustomTabBar({ state, navigation }: any) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-    paddingTop: 10,
-    paddingBottom: Platform.OS === "ios" ? 20 : 40,
-  },
-  tabItem: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 2,
-    paddingVertical: 8,
-  },
-  tabText: {
-    fontSize: 11,
-    fontWeight: "500",
-  },
-});
 
 export default function TabLayout() {
   return (
@@ -144,3 +109,24 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    paddingTop: 10,
+  },
+  tabItem: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 2,
+    paddingVertical: 8,
+  },
+  tabText: {
+    fontSize: 10,
+    fontWeight: "500",
+  },
+});

@@ -8,6 +8,7 @@ import {
   View,
   FlatList,
   BackHandler,
+  ActivityIndicator, // ✅ added
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect, router } from "expo-router";
@@ -148,20 +149,16 @@ export default function CartScreen() {
     }
   };
 
-  // ---------- UNIFIED RETURN ----------
   return (
     <View style={styles.container}>
-      {/* Header always present */}
       <Header
         title="CART"
         showBackButton
         onBackPress={handleBack}
-        // Dynamic background color based on state
-        backgroundColor={!hasItems || isLoading ? "#ffffffff" : "#f8f8f8"}
+        backgroundColor="#ffffffff"
         titleColor="#333"
       />
 
-      {/* Toast always mounted */}
       <DscToast
         visible={!!toast}
         message={toast?.message || ""}
@@ -170,9 +167,9 @@ export default function CartScreen() {
         showCloseButton
       />
 
-      {/* Dynamic Content - only the middle part changes */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#ED277C" />
           <Text style={styles.loadingText}>
             {isProcessing ? "Processing payment..." : "Loading..."}
           </Text>
@@ -192,7 +189,7 @@ export default function CartScreen() {
           <View style={styles.emptyAddItemBox}>
             <AddItemBox
               onAddItem={goToAddItem}
-              onSearch={() => { }}
+              onSearch={() => {}}
               onBarcodeScan={goToScan}
             />
           </View>
@@ -225,7 +222,7 @@ export default function CartScreen() {
           <View style={styles.addItemBoxWrapper}>
             <AddItemBox
               onAddItem={goToAddItem}
-              onSearch={() => { }}
+              onSearch={() => {}}
               onBarcodeScan={goToScan}
             />
           </View>
@@ -261,7 +258,7 @@ export default function CartScreen() {
         </View>
       )}
 
-      {/* Modals always rendered (conditionally visible) */}
+      {/* Modals */}
       <CartSummaryModal
         visible={summaryModalVisible}
         onClose={() => setSummaryModalVisible(false)}
@@ -309,7 +306,12 @@ export default function CartScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#ffffffff" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#ffffffff",
+  },
   loadingText: { marginTop: 12, fontSize: 16, color: "#666" },
   emptyContainer: {
     flex: 1,
@@ -332,8 +334,9 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     lineHeight: 22,
   },
-  emptyAddItemBox: { width: "100%", marginTop: 10 },
-  cartWithItemsContainer: { flex: 1 },
+  emptyAddItemBox: { width: "100%", marginTop: 10, marginBottom: 20 },
+
+  cartWithItemsContainer: { flex: 1, marginBottom: 40 },
   clearCartHeader: {
     backgroundColor: "#fff",
     paddingHorizontal: 20,
@@ -354,7 +357,12 @@ const styles = StyleSheet.create({
     borderColor: "#ED277C20",
   },
   clearCartText: { fontSize: 14, color: "#ED277C", fontWeight: "600" },
-  cartListContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 250 },
+
+  cartListContent: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 180,
+  },
   addItemBoxWrapper: {
     paddingHorizontal: 16,
     marginBottom: 10,
@@ -367,6 +375,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
+    paddingBottom: 20,
   },
   summaryRow: {
     flexDirection: "row",
@@ -384,6 +393,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     marginTop: 12,
+    marginBottom: 8,
   },
   confirmButtonDisabled: { opacity: 0.5 },
   confirmButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },

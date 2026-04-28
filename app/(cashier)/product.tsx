@@ -18,14 +18,35 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+// Extended type for display purposes
+interface ProductWithDisplay {
+  id: number;
+  name: string;
+  barcode: string | null;
+  price: number;
+  stock_quantity: number;
+  low_stock_threshold: number;
+  status: "stock" | "low stock" | "out of stock";
+  image: string | null;
+  image_exists: boolean;
+  category_id: number | null;
+  category_ids: number[];
+  created_at?: string;
+  updated_at?: string;
+  available: number;
+  categoryName: string;
+  displayImage?: string | number;
+}
+
 export default function ProductScreen() {
   const { addItem, itemCount, hasItems, cartItems } = useCart();
-  const { products, loading, fetchProducts, refreshProducts } = useProducts();
-  const { categories } = useCategories();
+  const { products, loading, fetchProducts } = useProducts();
+  const { categories, getCategoryNameById } = useCategories(); // Add getCategoryNameById
 
   const [searchQuery, setSearchQuery] = useState("");
+  // Changed default ID from 1 to -1 to avoid conflict with database categories
   const [selectedCategory, setSelectedCategory] = useState({
-    id: 1,
+    id: -1,
     name: "All items",
   });
   const [modalVisible, setModalVisible] = useState(false);
@@ -38,21 +59,29 @@ export default function ProductScreen() {
 
   // Compute products with availability, sort, and filter
   const computedProducts = useMemo(() => {
-    return products
+    console.log('Computing products, categories available:', categories.length);
+
+    const mapped = products
       .map((product) => {
         const inCart = cartItems.find((i) => i.id === product.id)?.quantity ?? 0;
         const available = Math.max(0, product.stock_quantity - inCart);
-        const firstCategoryId = product.category_ids?.[0] ?? product.category_id ?? 0;
-        const categoryName = firstCategoryId
-          ? categories.find((c) => c.id === firstCategoryId)?.category_name ?? ""
-          : "";
+
+        // Get category name using the helper from CategoryContext
+        let categoryName = "";
+        if (product.category_ids && product.category_ids.length > 0) {
+          // Use the first category ID to get the name
+          const firstCategoryId = product.category_ids[0];
+          categoryName = getCategoryNameById(firstCategoryId);
+          console.log(`Product ${product.name}: category_id=${firstCategoryId}, name="${categoryName}"`);
+        } else if (product.category_id) {
+          categoryName = getCategoryNameById(product.category_id);
+          console.log(`Product ${product.name}: single category_id=${product.category_id}, name="${categoryName}"`);
+        }
 
         return {
           ...product,
           available,
           categoryName,
-          categoryIds: product.category_ids ?? [],
-          image: product.image ?? null,
         };
       })
       .sort((a, b) => {
@@ -65,12 +94,17 @@ export default function ProductScreen() {
         const matchesSearch =
           !searchQuery ||
           product.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory =
-          selectedCategory.id === 1 ||
-          product.categoryIds.includes(selectedCategory.id);
+
+        // Filter logic: match if ID is -1 (All) or if category_ids includes the selected ID
+        const targetId = Number(selectedCategory.id);
+        const matchesCategory = targetId === -1 || product.category_ids.includes(targetId);
+
         return matchesSearch && matchesCategory;
       });
-  }, [products, cartItems, categories, searchQuery, selectedCategory]); // version ensures recompute after refresh
+
+    console.log('Filtered products count:', mapped.length);
+    return mapped;
+  }, [products, cartItems, categories, searchQuery, selectedCategory, getCategoryNameById]);
 
   const goToCart = () => router.push("/(cashier)/cart");
   const goBack = () => router.back();
@@ -95,7 +129,6 @@ export default function ProductScreen() {
     setModalVisible(false);
     goToCart();
   };
-
 
   const showBadge = hasItems;
   const badgeValue = itemCount > 99 ? "99+" : itemCount;
@@ -126,7 +159,6 @@ export default function ProductScreen() {
           onBackPress={goBack}
           backgroundColor="#ffffff"
           titleColor="#333"
-          rightComponent={CartButton}
         />
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#ED277C" />
@@ -144,7 +176,6 @@ export default function ProductScreen() {
           onBackPress={goBack}
           backgroundColor="#ffffff"
           titleColor="#333"
-          rightComponent={CartButton}
         />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>🔍</Text>
@@ -167,7 +198,6 @@ export default function ProductScreen() {
         onBackPress={goBack}
         backgroundColor="#ffffff"
         titleColor="#333"
-        rightComponent={CartButton}
       />
 
       <View style={styles.searchRow}>
@@ -214,7 +244,6 @@ export default function ProductScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
       />
-
 
       {selectedProduct && (
         <ProductModal

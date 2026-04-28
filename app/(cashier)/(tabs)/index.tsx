@@ -14,6 +14,8 @@ import { useCart } from "@/context/CartContext";
 import DscToast from "@/components/common/DscToast";
 // TEST
 import ProductItem from "@/components/test/learning/useToggleLearningComponent"
+import TestScreen from "@/components/test/layout/test";
+
 
 const { width } = Dimensions.get("window");
 
@@ -121,6 +123,7 @@ export default function HomeScreen() {
         )}
       </View>
     </View>
+    // <TestScreen />
   );
 }
 
